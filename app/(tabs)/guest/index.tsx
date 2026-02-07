@@ -12,10 +12,12 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import ServiceCard from "../../../components/ServiceCard";
 import CategoryButton from "../../../components/CategoryButton";
+import { useI18n } from "../../../lib/i18n";
 
 export default function GuestHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
 
   const [destination, setDestination] = useState("");
   const [date, setDate] = useState("");
@@ -28,46 +30,46 @@ export default function GuestHome() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const placeholderImage = require("../../../assets/images/react-logo.png");
   const categories = [
-    { label: "Riposo", icon: "bed-king" },
-    { label: "Doccia", icon: "shower" },
-    { label: "Deposito", icon: "locker" },
+    { label: t("category.rest"), icon: "bed-king" },
+    { label: t("category.shower"), icon: "shower" },
+    { label: t("category.storage"), icon: "locker" },
   ];
 
   // MOCK DATA CARDS
   const recentlyViewed = [
     {
       title: "Casa di Marcello",
-      type: "Riposo",
+      type: "Rest",
       price: "EUR 18",
       location: "Roma, RM",
     },
     {
       title: "Doccia Stazione",
-      type: "Doccia",
+      type: "Shower",
       price: "EUR 6",
       location: "Milano, MI",
     },
     {
       title: "Deposito Centro",
-      type: "Deposito",
+      type: "Storage",
       price: "EUR 4",
       location: "Firenze, FI",
     },
     {
       title: "Riposo Trastevere",
-      type: "Riposo",
+      type: "Rest",
       price: "EUR 22",
       location: "Roma, RM",
     },
     {
       title: "Doccia Navigli",
-      type: "Doccia",
+      type: "Shower",
       price: "EUR 7",
       location: "Milano, MI",
     },
     {
       title: "Deposito Duomo",
-      type: "Deposito",
+      type: "Storage",
       price: "EUR 5",
       location: "Firenze, FI",
     },
@@ -76,37 +78,37 @@ export default function GuestHome() {
   const aroundYou = [
     {
       title: "Doccia Parco",
-      type: "Doccia",
+      type: "Shower",
       price: "EUR 5",
       location: "Torino, TO",
     },
     {
       title: "Deposito Piazza",
-      type: "Deposito",
+      type: "Storage",
       price: "EUR 3",
       location: "Bologna, BO",
     },
     {
       title: "Riposo Stazione",
-      type: "Riposo",
+      type: "Rest",
       price: "EUR 16",
       location: "Napoli, NA",
     },
     {
       title: "Riposo Mare",
-      type: "Riposo",
+      type: "Rest",
       price: "EUR 19",
       location: "Genova, GE",
     },
     {
       title: "Doccia Porto",
-      type: "Doccia",
+      type: "Shower",
       price: "EUR 6",
       location: "Livorno, LI",
     },
     {
       title: "Deposito Centro Storico",
-      type: "Deposito",
+      type: "Storage",
       price: "EUR 4",
       location: "Bari, BA",
     },
@@ -177,7 +179,7 @@ export default function GuestHome() {
               />
               <TextInput
                 style={styles.inputField}
-                placeholder="Destination"
+                placeholder={t("home.destination")}
                 value={destination}
                 onChangeText={setDestination}
                 onFocus={closeDropdowns}
@@ -194,7 +196,7 @@ export default function GuestHome() {
                     }}
                   >
                     <Text style={styles.selectLabel}>
-                      {date || "Date"}
+                      {date || t("home.date")}
                     </Text>
                     <MaterialCommunityIcons
                       name="calendar-month"
@@ -204,7 +206,8 @@ export default function GuestHome() {
                   </TouchableOpacity>
                   {dateOpen && (
                     <View style={styles.dropdown}>
-                      {["Today", "Tomorrow", "This weekend"].map((d) => (
+                      {[t("day.today"), t("day.tomorrow"), t("day.weekend")].map(
+                        (d) => (
                         <TouchableOpacity
                           key={d}
                           style={styles.dropdownItem}
@@ -215,7 +218,8 @@ export default function GuestHome() {
                         >
                           <Text>{d}</Text>
                         </TouchableOpacity>
-                      ))}
+                      ),
+                      )}
                     </View>
                   )}
                 </View>
@@ -229,7 +233,7 @@ export default function GuestHome() {
                     }}
                   >
                     <Text style={styles.selectLabel}>
-                      {time || "Time"}
+                      {time || t("home.time")}
                     </Text>
                     <MaterialCommunityIcons
                       name="clock-outline"
@@ -263,7 +267,7 @@ export default function GuestHome() {
                     setPeopleOpen((v) => !v);
                   }}
                 >
-                  <Text style={styles.selectLabel}>{people || "People"}</Text>
+                  <Text style={styles.selectLabel}>{people || t("home.people")}</Text>
                   <MaterialCommunityIcons
                     name="account-group-outline"
                     size={18}
@@ -303,13 +307,13 @@ export default function GuestHome() {
                   });
                 }}
               >
-                <Text style={styles.searchButtonText}>Search</Text>
+                <Text style={styles.searchButtonText}>{t("home.search")}</Text>
               </TouchableOpacity>
           </View>
         </View>
 
         {/* Recently viewed */}
-        <Text style={styles.sectionTitle}>Recently viewed</Text>
+        <Text style={styles.sectionTitle}>{t("home.recentlyViewed")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {recentlyViewed.map((item) => (
             <ServiceCard
@@ -324,7 +328,7 @@ export default function GuestHome() {
         </ScrollView>
 
         {/* Around you */}
-        <Text style={styles.sectionTitle}>Around you</Text>
+        <Text style={styles.sectionTitle}>{t("home.aroundYou")}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {aroundYou.map((item) => (
             <ServiceCard

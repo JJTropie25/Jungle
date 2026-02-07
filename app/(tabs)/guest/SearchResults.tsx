@@ -11,14 +11,29 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import ServiceCard from "../../../components/ServiceCard";
 import ResultsActionBar from "../../../components/ResultsActionBar";
 import ResultsMap from "../../../components/ResultsMap";
+import Slider from "../../../components/UISlider";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useI18n } from "../../../lib/i18n";
 
 export default function SearchResults() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const placeholderImage = require("../../../assets/images/react-logo.png");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<
+    "priceUp" | "priceDown" | "topRated" | "nearest"
+  >("topRated");
+  const [filterBy, setFilterBy] = useState<"All" | "Price" | "Distance" | "Rating">(
+    "All",
+  );
+  const [priceMax, setPriceMax] = useState(500);
+  const [distanceMax, setDistanceMax] = useState(20);
+  const [ratingMin, setRatingMin] = useState(5);
+  const [isSliding, setIsSliding] = useState(false);
   const mapScrollRef = useRef<ScrollView>(null);
   const CARD_WIDTH = 260;
   const CARD_GAP = 12;
@@ -35,7 +50,7 @@ export default function SearchResults() {
   const results = [
     {
       title: "Doccia Centrale",
-      type: "Doccia",
+      typeKey: "category.shower",
       rating: 4.5,
       distance: "300m",
       price: "EUR 5",
@@ -45,7 +60,7 @@ export default function SearchResults() {
     },
     {
       title: "Deposito Stazione",
-      type: "Deposito",
+      typeKey: "category.storage",
       rating: 4.2,
       distance: "450m",
       price: "EUR 8",
@@ -55,7 +70,7 @@ export default function SearchResults() {
     },
     {
       title: "Riposo Centro",
-      type: "Riposo",
+      typeKey: "category.rest",
       rating: 4.8,
       distance: "200m",
       price: "EUR 10",
@@ -65,7 +80,7 @@ export default function SearchResults() {
     },
     {
       title: "Doccia Porta Nuova",
-      type: "Doccia",
+      typeKey: "category.shower",
       rating: 4.4,
       distance: "380m",
       price: "EUR 6",
@@ -75,7 +90,7 @@ export default function SearchResults() {
     },
     {
       title: "Deposito City Park",
-      type: "Deposito",
+      typeKey: "category.storage",
       rating: 4.1,
       distance: "520m",
       price: "EUR 4",
@@ -85,7 +100,7 @@ export default function SearchResults() {
     },
     {
       title: "Riposo Lungomare",
-      type: "Riposo",
+      typeKey: "category.rest",
       rating: 4.7,
       distance: "260m",
       price: "EUR 14",
@@ -95,7 +110,7 @@ export default function SearchResults() {
     },
     {
       title: "Doccia Universita",
-      type: "Doccia",
+      typeKey: "category.shower",
       rating: 4.0,
       distance: "610m",
       price: "EUR 5",
@@ -105,7 +120,7 @@ export default function SearchResults() {
     },
     {
       title: "Deposito Centro Storico",
-      type: "Deposito",
+      typeKey: "category.storage",
       rating: 4.3,
       distance: "430m",
       price: "EUR 5",
@@ -115,7 +130,7 @@ export default function SearchResults() {
     },
     {
       title: "Riposo Parco Nord",
-      type: "Riposo",
+      typeKey: "category.rest",
       rating: 4.6,
       distance: "310m",
       price: "EUR 12",
@@ -147,64 +162,183 @@ export default function SearchResults() {
     </View>
   );
 
+  const SortFilterMenus = () => (
+    <View style={styles.menuWrap}>
+      {sortOpen && (
+        <View style={styles.menuBox}>
+          {[
+            { value: "priceUp", label: t("search.sort.priceUp") },
+            { value: "priceDown", label: t("search.sort.priceDown") },
+            { value: "topRated", label: t("search.sort.topRated") },
+            { value: "nearest", label: t("search.sort.nearest") },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={styles.menuItem}
+              onPress={() => {
+                setSortBy(opt.value as any);
+                setSortOpen(false);
+              }}
+            >
+              <Text style={styles.menuText}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      {filterOpen && (
+        <View style={styles.menuBox}>
+          {[
+            { value: "All", label: t("search.filter.all") },
+            { value: "Price", label: t("search.filter.price") },
+            { value: "Distance", label: t("search.filter.distance") },
+            { value: "Rating", label: t("search.filter.rating") },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={styles.menuItem}
+              onPress={() => {
+                setFilterBy(opt.value as any);
+              }}
+            >
+              <Text style={styles.menuText}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+          {filterBy === "Price" && (
+            <View style={styles.sliderBox}>
+              <Text style={styles.sliderLabel}>
+                {t("search.maxPrice", { value: priceMax })}
+              </Text>
+              <Slider
+                minimumValue={0}
+                maximumValue={1000}
+                step={10}
+                value={priceMax}
+                onValueChange={(v: number) => {
+                  setIsSliding(true);
+                  setPriceMax(v);
+                }}
+                onSlidingStart={() => setIsSliding(true)}
+                onSlidingComplete={() => setIsSliding(false)}
+                minimumTrackTintColor="#111827"
+              />
+            </View>
+          )}
+          {filterBy === "Distance" && (
+            <View style={styles.sliderBox}>
+              <Text style={styles.sliderLabel}>
+                {t("search.maxDistance", { value: distanceMax })}
+              </Text>
+              <Slider
+                minimumValue={0}
+                maximumValue={100}
+                step={1}
+                value={distanceMax}
+                onValueChange={(v: number) => {
+                  setIsSliding(true);
+                  setDistanceMax(v);
+                }}
+                onSlidingStart={() => setIsSliding(true)}
+                onSlidingComplete={() => setIsSliding(false)}
+                minimumTrackTintColor="#111827"
+              />
+            </View>
+          )}
+          {filterBy === "Rating" && (
+            <View style={styles.sliderBox}>
+              <Text style={styles.sliderLabel}>
+                {t("search.minRating", { value: ratingMin })}
+              </Text>
+              <Slider
+                minimumValue={0}
+                maximumValue={10}
+                step={0.5}
+                value={ratingMin}
+                onValueChange={(v: number) => {
+                  setIsSliding(true);
+                  setRatingMin(v);
+                }}
+                onSlidingStart={() => setIsSliding(true)}
+                onSlidingComplete={() => setIsSliding(false)}
+                minimumTrackTintColor="#111827"
+              />
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.screen}>
       {viewMode === "list" ? (
-        <ScrollView
-          contentContainerStyle={[
-            styles.container,
-            { paddingTop: insets.top + 16 },
-          ]}
-        >
-          {/* SUMMARY BOX ORIZZONTALE */}
-          <View style={styles.summaryBox}>
-            <TouchableOpacity
-              style={styles.summaryBack}
-              onPress={() =>
-                router.canGoBack() ? router.back() : router.replace("/(tabs)/guest")
-              }
-            >
-              <MaterialCommunityIcons name="arrow-left" size={20} color="#111827" />
-            </TouchableOpacity>
-            <SummaryLine />
-          </View>
+        <View style={styles.listWrap}>
+          <View style={[styles.listHeader, { paddingTop: insets.top + 16 }]}>
+            <View style={styles.summaryBox}>
+              <TouchableOpacity
+                style={styles.summaryBack}
+                onPress={() =>
+                  router.canGoBack() ? router.back() : router.replace("/(tabs)/guest")
+                }
+              >
+                <MaterialCommunityIcons name="arrow-left" size={20} color="#111827" />
+              </TouchableOpacity>
+              <SummaryLine />
+            </View>
 
-          {/* ACTIONS */}
-          <ResultsActionBar
-            actions={[
-              { label: "Sort" },
-              { label: "Filter" },
-              { label: "Map", onPress: () => setViewMode("map") },
+            <ResultsActionBar
+              actions={[
+              {
+                label: t(`search.sort.${sortBy}`),
+                onPress: () => {
+                  setSortOpen((v) => !v);
+                  setFilterOpen(false);
+                },
+              },
+              {
+                label: t("search.filter"),
+                onPress: () => {
+                  setFilterOpen((v) => !v);
+                  setSortOpen(false);
+                },
+                badge: filterBy !== "All",
+              },
+              { label: t("search.map"), onPress: () => setViewMode("map") },
             ]}
           />
+            <SortFilterMenus />
+          </View>
 
-          {/* RESULTS */}
-          {results.map((item) => (
-            <ServiceCard
-              key={item.title}
-              fullWidth
-              horizontal
-              containerStyle={styles.card}
-              imageStyle={styles.cardImage}
-              imageSource={placeholderImage}
-              title={item.title}
-              price={item.price}
-              location={item.location}
-              meta={`${item.type} · ${item.distance} · Rating ${item.rating}`}
-              onPress={() =>
-                router.push({
-                  pathname: "/(tabs)/guest/ServiceDetails",
-                  params: {
-                    destination,
-                    timeslot,
-                    people,
-                    microservice: item.title,
-                  },
-                })
-              }
-            />
-          ))}
-        </ScrollView>
+          <ScrollView
+            contentContainerStyle={styles.container}
+            scrollEnabled={!isSliding && !sortOpen && !filterOpen}
+          >
+            {results.map((item) => (
+              <ServiceCard
+                key={item.title}
+                fullWidth
+                horizontal
+                containerStyle={styles.card}
+                imageStyle={styles.cardImage}
+                imageSource={placeholderImage}
+                title={item.title}
+                price={item.price}
+                location={item.location}
+              meta={`${t(item.typeKey)} - ${item.distance} - ${t("label.rating")} ${item.rating}`}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(tabs)/guest/ServiceDetails",
+                    params: {
+                      destination,
+                      timeslot,
+                      people,
+                      microservice: item.title,
+                    },
+                  })
+                }
+              />
+            ))}
+          </ScrollView>
+        </View>
       ) : (
         <View style={styles.mapContainer}>
           <ResultsMap
@@ -237,11 +371,25 @@ export default function SearchResults() {
 
             <ResultsActionBar
               actions={[
-                { label: "Sort" },
-                { label: "Filter" },
-                { label: "List", onPress: () => setViewMode("list") },
+              {
+                label: t(`search.sort.${sortBy}`),
+                onPress: () => {
+                  setSortOpen((v) => !v);
+                  setFilterOpen(false);
+                },
+              },
+              {
+                label: t("search.filter"),
+                onPress: () => {
+                  setFilterOpen((v) => !v);
+                  setSortOpen(false);
+                },
+                badge: filterBy !== "All",
+              },
+                { label: t("search.list"), onPress: () => setViewMode("list") },
               ]}
             />
+            <SortFilterMenus />
           </View>
 
           <View style={styles.mapBottom}>
@@ -270,7 +418,7 @@ export default function SearchResults() {
                   title={item.title}
                   price={item.price}
                   location={item.location}
-                  meta={`${item.type} · ${item.distance} · Rating ${item.rating}`}
+                  meta={`${t(item.typeKey)} - ${item.distance} - ${t("label.rating")} ${item.rating}`}
                   onPress={() =>
                     router.push({
                       pathname: "/(tabs)/guest/ServiceDetails",
@@ -294,6 +442,12 @@ export default function SearchResults() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#fff" },
+  listWrap: { flex: 1 },
+  listHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+    backgroundColor: "#fff",
+  },
   container: {
     padding: 16,
     paddingBottom: 24,
@@ -339,15 +493,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  card: {
-    marginBottom: 12,
-  },
-  cardImage: {
-    height: 90,
-  },
-  mapContainer: {
-    flex: 1,
-  },
+  card: { marginBottom: 12 },
+  cardImage: { height: 90 },
+  mapContainer: { flex: 1 },
   mapTop: {
     position: "absolute",
     top: 0,
@@ -362,14 +510,33 @@ const styles = StyleSheet.create({
     bottom: 16,
     paddingHorizontal: 16,
   },
-  mapCards: {
-    paddingRight: 16,
+  mapCards: { paddingRight: 16 },
+  mapCard: { width: 260, marginRight: 12 },
+  mapCardImage: { height: 80 },
+  menuWrap: { gap: 8, marginBottom: 8 },
+  menuBox: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    overflow: "hidden",
   },
-  mapCard: {
-    width: 260,
-    marginRight: 12,
+  menuItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
   },
-  mapCardImage: {
-    height: 80,
+  menuText: { color: "#111827", fontWeight: "600" },
+  sliderBox: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#f3f4f6",
+  },
+  sliderLabel: {
+    fontWeight: "600",
+    marginBottom: 6,
+    color: "#111827",
   },
 });

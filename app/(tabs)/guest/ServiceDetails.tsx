@@ -9,10 +9,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useI18n } from "../../../lib/i18n";
 
 export default function ServiceDetails() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const { destination, timeslot, people, microservice } =
     useLocalSearchParams<{
       destination?: string;
@@ -68,7 +70,7 @@ export default function ServiceDetails() {
         </View>
 
         {/* HOURS */}
-        <Text style={styles.sectionTitle}>Available times</Text>
+        <Text style={styles.sectionTitle}>{t("service.availableTimes")}</Text>
         <View style={styles.grid}>
           {hours.map((h) => (
             <TouchableOpacity
@@ -102,7 +104,7 @@ export default function ServiceDetails() {
           })
         }
       >
-          <Text style={styles.bookText}>Book now</Text>
+          <Text style={styles.bookText}>{t("service.bookNow")}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

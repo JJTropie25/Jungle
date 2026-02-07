@@ -2,15 +2,17 @@ import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import ServiceCard from "../../components/ServiceCard";
+import { useI18n } from "../../lib/i18n";
 
 export default function Favorites() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const placeholderImage = require("../../assets/images/react-logo.png");
   const favorites = [
     {
       title: "Casa di Marcello",
-      type: "Riposo",
+      typeKey: "category.rest",
       price: "EUR 18",
       location: "Roma, RM",
       distance: "350m",
@@ -18,7 +20,7 @@ export default function Favorites() {
     },
     {
       title: "Doccia Stazione",
-      type: "Doccia",
+      typeKey: "category.shower",
       price: "EUR 6",
       location: "Milano, MI",
       distance: "500m",
@@ -26,7 +28,7 @@ export default function Favorites() {
     },
     {
       title: "Deposito Centro",
-      type: "Deposito",
+      typeKey: "category.storage",
       price: "EUR 4",
       location: "Firenze, FI",
       distance: "700m",
@@ -42,7 +44,7 @@ export default function Favorites() {
           { paddingTop: insets.top + 16 },
         ]}
       >
-        <Text style={styles.title}>I tuoi preferiti</Text>
+        <Text style={styles.title}>{t("favorites.title")}</Text>
 
         {favorites.map((item) => (
           <ServiceCard
@@ -55,7 +57,7 @@ export default function Favorites() {
             title={item.title}
             price={item.price}
             location={item.location}
-            meta={`${item.type} · ${item.distance} · Rating ${item.rating}`}
+            meta={`${t(item.typeKey)} · ${item.distance} · Rating ${item.rating}`}
             onPress={() =>
               router.push({
                 pathname: "/(tabs)/guest/ServiceDetails",

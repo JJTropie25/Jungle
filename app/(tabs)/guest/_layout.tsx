@@ -8,6 +8,8 @@ export default function GuestLayout() {
       <Stack.Screen name="SearchResults" />
       <Stack.Screen name="ServiceDetails" />
       <Stack.Screen name="BookingConfirmation" />
+      <Stack.Screen name="Directions" />
+      <Stack.Screen name="ManageBooking" />
     </Stack>
   );
 }

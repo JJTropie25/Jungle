@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 type Action = {
   label: string;
   onPress?: () => void;
+  badge?: boolean;
 };
 
 export default function ResultsActionBar({ actions }: { actions: Action[] }) {
@@ -15,6 +16,7 @@ export default function ResultsActionBar({ actions }: { actions: Action[] }) {
           onPress={action.onPress}
         >
           <Text>{action.label}</Text>
+          {action.badge ? <View style={styles.badge} /> : null}
         </TouchableOpacity>
       ))}
     </View>
@@ -34,5 +36,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#eee",
     borderRadius: 8,
     alignItems: "center",
+    position: "relative",
+  },
+  badge: {
+    position: "absolute",
+    top: 6,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#111827",
   },
 });

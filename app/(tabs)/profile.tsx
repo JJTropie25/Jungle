@@ -1,6 +1,10 @@
-import { View, Text, StyleSheet, Image, Pressable } from "react-native";
+import { View, Text, StyleSheet, Image, Pressable, Alert } from "react-native";
+import { useRouter } from "expo-router";
+import { useI18n } from "../../lib/i18n";
 
 export default function Profile() {
+  const router = useRouter();
+  const { t } = useI18n();
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -12,11 +16,27 @@ export default function Profile() {
       </View>
 
       <View style={styles.actions}>
-        <Pressable style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Change personal info</Text>
+        <Pressable
+          style={styles.primaryButton}
+          onPress={() => router.push("/(tabs)/profile/Edit")}
+        >
+          <Text style={styles.primaryButtonText}>{t("profile.editInfo")}</Text>
         </Pressable>
-        <Pressable style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>Logout</Text>
+        <Pressable
+          style={styles.secondaryButton}
+          onPress={() => router.push("/(tabs)/profile/Language")}
+        >
+          <Text style={styles.secondaryButtonText}>
+            {t("profile.changeLanguage")}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={styles.secondaryButton}
+          onPress={() =>
+            Alert.alert(t("profile.logout"), t("profile.logoutNotImplemented"))
+          }
+        >
+          <Text style={styles.secondaryButtonText}>{t("profile.logout")}</Text>
         </Pressable>
       </View>
     </View>

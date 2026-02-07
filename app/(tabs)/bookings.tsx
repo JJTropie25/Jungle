@@ -5,29 +5,39 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useI18n } from "../../lib/i18n";
 
 export default function Bookings() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const bookings = [
     {
       title: "Doccia Centrale",
       destination: "Roma, RM",
-      timeslot: "Oggi 10:00",
+      timeslot: `${t("day.today")} 10:00`,
       people: "1",
+      latitude: 41.9028,
+      longitude: 12.4964,
     },
     {
       title: "Deposito Stazione",
       destination: "Milano, MI",
-      timeslot: "Domani 14:00",
+      timeslot: `${t("day.tomorrow")} 14:00`,
       people: "2",
+      latitude: 45.4642,
+      longitude: 9.19,
     },
     {
       title: "Riposo Centro",
       destination: "Firenze, FI",
-      timeslot: "Venerdi 18:00",
+      timeslot: `${t("day.friday")} 18:00`,
       people: "1",
+      latitude: 43.7696,
+      longitude: 11.2558,
     },
   ];
 
@@ -39,7 +49,7 @@ export default function Bookings() {
           { paddingTop: insets.top + 16 },
         ]}
       >
-        <Text style={styles.title}>Le tue prenotazioni</Text>
+        <Text style={styles.title}>{t("bookings.title")}</Text>
 
         {bookings.map((item) => (
           <View key={item.title} style={styles.card}>
@@ -61,11 +71,40 @@ export default function Bookings() {
               </View>
             </View>
             <View style={styles.buttonRow}>
-              <TouchableOpacity style={styles.cardButton}>
-                <Text>Get directions</Text>
+              <TouchableOpacity
+                style={styles.cardButton}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(tabs)/guest/Directions",
+                    params: {
+                      microservice: item.title,
+                      destination: item.destination,
+                      timeslot: item.timeslot,
+                      people: item.people,
+                      latitude: String(item.latitude),
+                      longitude: String(item.longitude),
+                    },
+                  })
+                }
+              >
+                <Text>{t("booking.getDirections")}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.cardButton}>
-                <Text>Manage booking</Text>
+              <TouchableOpacity
+                style={styles.cardButton}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(tabs)/guest/ManageBooking",
+                    params: {
+                      from: "bookings",
+                      microservice: item.title,
+                      destination: item.destination,
+                      timeslot: item.timeslot,
+                      people: item.people,
+                    },
+                  })
+                }
+              >
+                <Text>{t("booking.manage")}</Text>
               </TouchableOpacity>
             </View>
           </View>
