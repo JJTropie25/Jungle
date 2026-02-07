@@ -7,9 +7,12 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function ServiceDetails() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { destination, timeslot, people, microservice } =
     useLocalSearchParams<{
       destination?: string;
@@ -22,74 +25,136 @@ export default function ServiceDetails() {
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* SUMMARY */}
-      <View style={styles.summaryBox}>
-        <Text style={styles.summaryText}>
-          {destination} | {timeslot} | {people} person
-        </Text>
-        <Text style={styles.title}>{microservice}</Text>
-      </View>
-
-      {/* IMAGE MOCK */}
-      <View style={styles.imageMock}>
-        <Text>IMAGE</Text>
-      </View>
-
-      {/* HOURS */}
-      <Text style={styles.sectionTitle}>Available times</Text>
-      <View style={styles.grid}>
-        {hours.map((h) => (
-          <TouchableOpacity
-            key={h}
-            style={[
-              styles.hourButton,
-              selectedHour === h && styles.hourButtonSelected,
-            ]}
-            onPress={() => setSelectedHour(h)}
-          >
-            <Text
-              style={selectedHour === h ? styles.hourTextSelected : undefined}
-            >
-              {h}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* BOOK */}
-      <TouchableOpacity
-        style={[
-          styles.bookButton,
-          !selectedHour && styles.bookButtonDisabled,
+    <SafeAreaView style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          { paddingTop: insets.top + 16 },
         ]}
-        disabled={!selectedHour}
+      >
+        {/* SUMMARY */}
+        <View style={styles.summaryBox}>
+          <TouchableOpacity
+            style={styles.summaryBack}
+            onPress={() =>
+              router.canGoBack() ? router.back() : router.replace("/(tabs)/guest")
+            }
+          >
+            <MaterialCommunityIcons name="arrow-left" size={20} color="#111827" />
+          </TouchableOpacity>
+          <View style={styles.summaryContent}>
+            <View style={styles.summaryLine}>
+              <Text style={styles.summaryItem}>{microservice ?? "-"}</Text>
+              <Text style={styles.summarySep}>|</Text>
+              <Text style={styles.summaryItem}>{destination ?? "-"}</Text>
+              <Text style={styles.summarySep}>|</Text>
+              <Text style={styles.summaryItem}>{timeslot ?? "-"}</Text>
+              <Text style={styles.summarySep}>|</Text>
+              <View style={styles.summaryPeople}>
+                <MaterialCommunityIcons
+                  name="account-group"
+                  size={16}
+                  color="#111827"
+                />
+                <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* IMAGE MOCK */}
+        <View style={styles.imageMock}>
+          <Text>IMAGE</Text>
+        </View>
+
+        {/* HOURS */}
+        <Text style={styles.sectionTitle}>Available times</Text>
+        <View style={styles.grid}>
+          {hours.map((h) => (
+            <TouchableOpacity
+              key={h}
+              style={[
+                styles.hourButton,
+                selectedHour === h && styles.hourButtonSelected,
+              ]}
+              onPress={() => setSelectedHour(h)}
+            >
+              <Text
+                style={selectedHour === h ? styles.hourTextSelected : undefined}
+              >
+                {h}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* BOOK */}
+        <TouchableOpacity
+          style={[
+            styles.bookButton,
+            !selectedHour && styles.bookButtonDisabled,
+          ]}
+          disabled={!selectedHour}
         onPress={() =>
           router.push({
-            pathname: "/guest/BookingConfirmation",
+            pathname: "/(tabs)/guest/BookingConfirmation",
             params: { destination, timeslot, people, microservice, selectedHour },
           })
         }
       >
-        <Text style={styles.bookText}>Book now</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          <Text style={styles.bookText}>Book now</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16 },
+  screen: { flex: 1, backgroundColor: "#fff" },
+  container: { padding: 16, paddingBottom: 24 },
   summaryBox: {
     backgroundColor: "#f2f2f2",
     padding: 12,
     borderRadius: 10,
     marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  summaryBack: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#e5e7eb",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  summaryContent: {
+    flex: 1,
   },
   summaryText: { fontWeight: "600" },
-  title: {
-    marginTop: 4,
-    fontSize: 18,
-    fontWeight: "700",
+  summaryLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    columnGap: 8,
+    rowGap: 4,
+  },
+  summaryItem: {
+    fontWeight: "600",
+    color: "#111827",
+  },
+  summarySep: {
+    color: "#9ca3af",
+    fontWeight: "600",
+  },
+  summaryPeople: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  summaryPeopleText: {
+    fontWeight: "600",
   },
   imageMock: {
     height: 180,

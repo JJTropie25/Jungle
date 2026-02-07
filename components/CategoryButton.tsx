@@ -1,9 +1,32 @@
 import { Pressable, Text, StyleSheet } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-export default function CategoryButton({ label }: { label: string }) {
+type CategoryButtonProps = {
+  label: string;
+  icon: string;
+  onPress?: () => void;
+  selected?: boolean;
+};
+
+export default function CategoryButton({
+  label,
+  icon,
+  onPress,
+  selected,
+}: CategoryButtonProps) {
   return (
-    <Pressable style={styles.button}>
-      <Text style={styles.text}>{label}</Text>
+    <Pressable
+      style={[styles.button, selected && styles.buttonSelected]}
+      onPress={onPress}
+    >
+      <MaterialCommunityIcons
+        name={icon as any}
+        size={20}
+        color={selected ? "#fff" : "#111827"}
+      />
+      <Text style={[styles.text, selected && styles.textSelected]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -13,9 +36,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     backgroundColor: "#eee",
-    borderRadius: 12,
+    borderRadius: 8,
+    width: "30%",
+    alignItems: "center",
+    gap: 6,
+  },
+  buttonSelected: {
+    backgroundColor: "#111827",
   },
   text: {
-    fontWeight: "500",
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  textSelected: {
+    color: "#fff",
   },
 });

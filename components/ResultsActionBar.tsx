@@ -1,11 +1,20 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 
-export default function ResultsActionBar() {
+type Action = {
+  label: string;
+  onPress?: () => void;
+};
+
+export default function ResultsActionBar({ actions }: { actions: Action[] }) {
   return (
     <View style={styles.container}>
-      {["Sort", "Filter", "Map"].map((item) => (
-        <TouchableOpacity key={item} style={styles.button}>
-          <Text>{item}</Text>
+      {actions.map((action) => (
+        <TouchableOpacity
+          key={action.label}
+          style={styles.button}
+          onPress={action.onPress}
+        >
+          <Text>{action.label}</Text>
         </TouchableOpacity>
       ))}
     </View>
