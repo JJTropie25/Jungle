@@ -1,0 +1,23 @@
+insert into public.services (title, category, price_eur, location, city, region, latitude, longitude, rating, distance_meters, section)
+values
+  ('Casa di Marcello', 'rest', 18, 'Roma, RM', 'Roma', 'RM', 41.9028, 12.4964, 4.6, 300, 'recently'),
+  ('Doccia Stazione', 'shower', 6, 'Milano, MI', 'Milano', 'MI', 45.4642, 9.19, 4.2, 450, 'recently'),
+  ('Deposito Centro', 'storage', 4, 'Firenze, FI', 'Firenze', 'FI', 43.7696, 11.2558, 4.3, 520, 'recently'),
+  ('Riposo Trastevere', 'rest', 22, 'Roma, RM', 'Roma', 'RM', 41.9028, 12.4964, 4.7, 260, 'recently'),
+  ('Doccia Navigli', 'shower', 7, 'Milano, MI', 'Milano', 'MI', 45.4642, 9.19, 4.4, 380, 'recently'),
+  ('Deposito Duomo', 'storage', 5, 'Firenze, FI', 'Firenze', 'FI', 43.7696, 11.2558, 4.1, 430, 'recently'),
+  ('Doccia Parco', 'shower', 5, 'Torino, TO', 'Torino', 'TO', 45.0703, 7.6869, 4.0, 610, 'around'),
+  ('Deposito Piazza', 'storage', 3, 'Bologna, BO', 'Bologna', 'BO', 44.4949, 11.3426, 4.1, 520, 'around'),
+  ('Riposo Stazione', 'rest', 16, 'Napoli, NA', 'Napoli', 'NA', 40.8518, 14.2681, 4.7, 260, 'around'),
+  ('Riposo Mare', 'rest', 19, 'Genova, GE', 'Genova', 'GE', 44.4056, 8.9463, 4.5, 310, 'around'),
+  ('Doccia Porto', 'shower', 6, 'Livorno, LI', 'Livorno', 'LI', 43.5519, 10.3082, 4.0, 380, 'around'),
+  ('Deposito Centro Storico', 'storage', 4, 'Bari, BA', 'Bari', 'BA', 41.1171, 16.8719, 4.3, 430, 'around'),
+  ('Doccia Centrale', 'shower', 5, 'Roma, RM', 'Roma', 'RM', 41.9028, 12.4964, 4.5, 300, null),
+  ('Deposito Stazione', 'storage', 8, 'Milano, MI', 'Milano', 'MI', 45.4642, 9.19, 4.2, 450, null),
+  ('Riposo Centro', 'rest', 10, 'Firenze, FI', 'Firenze', 'FI', 43.7696, 11.2558, 4.8, 200, null),
+  ('Doccia Porta Nuova', 'shower', 6, 'Torino, TO', 'Torino', 'TO', 45.0703, 7.6869, 4.4, 380, null),
+  ('Deposito City Park', 'storage', 4, 'Bologna, BO', 'Bologna', 'BO', 44.4949, 11.3426, 4.1, 520, null),
+  ('Riposo Lungomare', 'rest', 14, 'Napoli, NA', 'Napoli', 'NA', 40.8518, 14.2681, 4.7, 260, null),
+  ('Doccia Universita', 'shower', 5, 'Padova, PD', 'Padova', 'PD', 45.4064, 11.8768, 4.0, 610, null),
+  ('Deposito Centro Storico', 'storage', 5, 'Verona, VR', 'Verona', 'VR', 45.4384, 10.9916, 4.3, 430, null),
+  ('Riposo Parco Nord', 'rest', 12, 'Milano, MI', 'Milano', 'MI', 45.4782, 9.2266, 4.6, 310, null);

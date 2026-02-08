@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
+import { colors } from "../lib/theme";
 
 type Props = {
   minimumValue?: number;
@@ -18,7 +19,7 @@ export default function UISlider({
   step = 1,
   value = 0,
   onValueChange,
-  minimumTrackTintColor = "#111827",
+  minimumTrackTintColor = colors.textPrimary,
   onSlidingStart,
   onSlidingComplete,
 }: Props) {

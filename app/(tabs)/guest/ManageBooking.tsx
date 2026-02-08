@@ -1,21 +1,53 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useI18n } from "../../../lib/i18n";
+import { useEffect, useState } from "react";
+import { supabase } from "../../../lib/supabase";
+import QRCode from "react-native-qrcode-svg";
+import { colors } from "../../../lib/theme";
 
 export default function ManageBooking() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
-  const { destination, timeslot, people, microservice, from } =
+  const { destination, timeslot, people, microservice, from, bookingId, qrToken } =
     useLocalSearchParams<{
       destination?: string;
       timeslot?: string;
       people?: string;
       microservice?: string;
       from?: string;
+      bookingId?: string;
+      qrToken?: string;
     }>();
+  const [token, setToken] = useState<string | null>(qrToken ?? null);
+  const [canceling, setCanceling] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!supabase || !bookingId) return;
+    supabase
+      .from("bookings")
+      .select("qr_token")
+      .eq("id", bookingId)
+      .single()
+      .then(({ data }) => {
+        if (!isMounted) return;
+        if (data?.qr_token) setToken(data.qr_token);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [bookingId]);
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -35,7 +67,7 @@ export default function ManageBooking() {
             }
           }}
         >
-          <MaterialCommunityIcons name="arrow-left" size={20} color="#111827" />
+          <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.thankYou}>{t("booking.manageTitle")}</Text>
 
@@ -50,7 +82,7 @@ export default function ManageBooking() {
             <Text style={styles.summaryItem}>{timeslot ?? "-"}</Text>
             <Text style={styles.summarySep}>|</Text>
             <View style={styles.summaryPeople}>
-              <MaterialCommunityIcons name="account-group" size={16} color="#111827" />
+              <MaterialCommunityIcons name="account-group" size={16} color={colors.textPrimary} />
               <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
             </View>
           </View>
@@ -60,13 +92,45 @@ export default function ManageBooking() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t("booking.accessQr")}</Text>
           <View style={styles.qrMock}>
-            <Text>{t("booking.qrCode")}</Text>
+            {token ? <QRCode value={token} size={160} /> : <Text>{t("booking.qrCode")}</Text>}
           </View>
         </View>
 
         {/* Actions */}
         <View style={styles.actions}>
-          <TouchableOpacity style={[styles.actionButton, styles.danger]}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.danger]}
+            onPress={() => {
+              if (!bookingId || !supabase) {
+                Alert.alert(
+                  t("booking.cancel"),
+                  "Unable to cancel this booking."
+                );
+                return;
+              }
+              Alert.alert(t("booking.cancel"), t("booking.cancelConfirm"), [
+                { text: t("booking.cancelNo"), style: "cancel" },
+                {
+                  text: t("booking.cancelYes"),
+                  style: "destructive",
+                  onPress: async () => {
+                    setCanceling(true);
+                    const { error } = await supabase
+                      .from("bookings")
+                      .delete()
+                      .eq("id", bookingId);
+                    setCanceling(false);
+                    if (error) {
+                      Alert.alert(t("booking.cancel"), error.message);
+                      return;
+                    }
+                    router.replace("/(tabs)/bookings");
+                  },
+                },
+              ]);
+            }}
+            disabled={canceling}
+          >
             <Text style={styles.actionTextLight}>{t("booking.cancel")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
@@ -79,7 +143,7 @@ export default function ManageBooking() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#fff" },
+  screen: { flex: 1, backgroundColor: colors.background },
   container: { padding: 16, paddingBottom: 24 },
   thankYou: {
     fontSize: 20,
@@ -91,18 +155,18 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#e5e7eb",
+    backgroundColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 8,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: colors.border,
   },
   cardTitle: {
     fontWeight: "700",
@@ -118,10 +182,10 @@ const styles = StyleSheet.create({
   },
   summaryItem: {
     fontWeight: "600",
-    color: "#111827",
+    color: colors.textPrimary,
   },
   summarySep: {
-    color: "#9ca3af",
+    color: colors.textMuted,
     fontWeight: "600",
   },
   summaryPeople: {
@@ -134,7 +198,7 @@ const styles = StyleSheet.create({
   },
   qrMock: {
     height: 180,
-    backgroundColor: "#ddd",
+    backgroundColor: colors.border,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
@@ -145,19 +209,19 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     padding: 14,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 10,
     alignItems: "center",
   },
   actionText: {
     fontWeight: "600",
-    color: "#111827",
+    color: colors.textPrimary,
   },
   danger: {
-    backgroundColor: "#111827",
+    backgroundColor: colors.textPrimary,
   },
   actionTextLight: {
     fontWeight: "600",
-    color: "#fff",
+    color: colors.background,
   },
 });

@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useI18n } from "../../../lib/i18n";
+import { colors } from "../../../lib/theme";
 
 export default function Language() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function Language() {
           style={styles.backButton}
           onPress={() => router.replace("/(tabs)/profile")}
         >
-          <MaterialCommunityIcons name="arrow-left" size={20} color="#111827" />
+          <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
 
         <Text style={styles.title}>{t("language.title")}</Text>
@@ -96,7 +97,7 @@ export default function Language() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#fff" },
+  screen: { flex: 1, backgroundColor: colors.background },
   container: {
     paddingHorizontal: 24,
   },
@@ -104,7 +105,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#e5e7eb",
+    backgroundColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
@@ -112,7 +113,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#111827",
+    color: colors.textPrimary,
     marginBottom: 16,
   },
   options: {
@@ -122,16 +123,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.surfaceSoft,
   },
   optionSelected: {
-    backgroundColor: "#111827",
+    backgroundColor: colors.textPrimary,
   },
   optionText: {
     fontWeight: "600",
-    color: "#111827",
+    color: colors.textPrimary,
   },
   optionTextSelected: {
-    color: "#fff",
+    color: colors.background,
   },
 });

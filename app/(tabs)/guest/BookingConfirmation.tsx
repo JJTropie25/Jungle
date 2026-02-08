@@ -4,24 +4,52 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useI18n } from "../../../lib/i18n";
+import { useEffect, useState } from "react";
+import { supabase } from "../../../lib/supabase";
+import QRCode from "react-native-qrcode-svg";
+import { colors } from "../../../lib/theme";
 
 export default function BookingConfirmation() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
-  const { destination, timeslot, people, microservice, selectedHour } =
+  const { destination, timeslot, people, microservice, selectedHour, bookingId, qrToken } =
     useLocalSearchParams<{
       destination?: string;
       timeslot?: string;
       people?: string;
       microservice?: string;
       selectedHour?: string;
+      bookingId?: string;
+      qrToken?: string;
     }>();
+  const [token, setToken] = useState<string | null>(qrToken ?? null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const placeholderImage = require("../../../assets/images/react-logo.png");
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!supabase || !bookingId) return;
+    supabase
+      .from("bookings")
+      .select("qr_token, service:services(image_url)")
+      .eq("id", bookingId)
+      .single()
+      .then(({ data }) => {
+        if (!isMounted) return;
+        if (data?.qr_token) setToken(data.qr_token);
+        if (data?.service?.image_url) setImageUrl(data.service.image_url);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [bookingId]);
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -35,6 +63,10 @@ export default function BookingConfirmation() {
 
         {/* Service recap card */}
         <View style={styles.card}>
+          <Image
+            source={imageUrl ? { uri: imageUrl } : placeholderImage}
+            style={styles.cardImage}
+          />
           <Text style={styles.cardTitle}>{microservice}</Text>
           <View style={styles.summaryLine}>
             <Text style={styles.summaryItem}>{microservice ?? "-"}</Text>
@@ -47,7 +79,7 @@ export default function BookingConfirmation() {
               <MaterialCommunityIcons
                 name="account-group"
                 size={16}
-                color="#111827"
+                color={colors.textPrimary}
               />
               <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
             </View>
@@ -76,6 +108,8 @@ export default function BookingConfirmation() {
                 router.push({
                   pathname: "/(tabs)/guest/ManageBooking",
                   params: {
+                    bookingId,
+                    qrToken,
                     microservice,
                     destination,
                     timeslot,
@@ -93,7 +127,11 @@ export default function BookingConfirmation() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t("booking.accessQr")}</Text>
           <View style={styles.qrMock}>
-            <Text>{t("booking.qrCode")}</Text>
+            {token ? (
+              <QRCode value={token} size={160} />
+            ) : (
+              <Text>{t("booking.qrCode")}</Text>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -102,7 +140,7 @@ export default function BookingConfirmation() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#fff" },
+  screen: { flex: 1, backgroundColor: colors.background },
   container: { padding: 16, paddingBottom: 24 },
   thankYou: {
     fontSize: 20,
@@ -111,12 +149,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: colors.border,
+  },
+  cardImage: {
+    width: "100%",
+    height: 140,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: colors.border,
   },
   cardTitle: {
     fontWeight: "700",
@@ -133,10 +178,10 @@ const styles = StyleSheet.create({
   },
   summaryItem: {
     fontWeight: "600",
-    color: "#111827",
+    color: colors.textPrimary,
   },
   summarySep: {
-    color: "#9ca3af",
+    color: colors.textMuted,
     fontWeight: "600",
   },
   summaryPeople: {
@@ -155,14 +200,14 @@ const styles = StyleSheet.create({
   cardButton: {
     flex: 1,
     padding: 12,
-    backgroundColor: "#eee",
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 8,
     alignItems: "center",
     marginHorizontal: 4,
   },
   qrMock: {
     height: 180,
-    backgroundColor: "#ddd",
+    backgroundColor: colors.border,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
