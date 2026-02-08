@@ -11,6 +11,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useI18n } from "../../../lib/i18n";
 import { useEffect, useState } from "react";
+import { useAuthState } from "../../../lib/auth";
 import { supabase } from "../../../lib/supabase";
 import QRCode from "react-native-qrcode-svg";
 import { colors } from "../../../lib/theme";
@@ -31,6 +32,7 @@ export default function ManageBooking() {
     }>();
   const [token, setToken] = useState<string | null>(qrToken ?? null);
   const [canceling, setCanceling] = useState(false);
+  const { user } = useAuthState();
 
   useEffect(() => {
     let isMounted = true;
@@ -115,16 +117,53 @@ export default function ManageBooking() {
                   style: "destructive",
                   onPress: async () => {
                     setCanceling(true);
-                    const { error } = await supabase
-                      .from("bookings")
-                      .delete()
-                      .eq("id", bookingId);
-                    setCanceling(false);
-                    if (error) {
-                      Alert.alert(t("booking.cancel"), error.message);
-                      return;
+                    try {
+                      if (!user) {
+                        setCanceling(false);
+                        Alert.alert(t("booking.cancel"), t("bookings.signIn") || "Please sign in to cancel bookings.");
+                        return;
+                      }
+
+                      // fetch booking owner to verify permissions (safe check)
+                      const idToUse = bookingId && /^[0-9]+$/.test(String(bookingId)) ? Number(bookingId) : bookingId;
+                      console.log("ManageBooking: attempting delete", { bookingId: idToUse, userId: user.id });
+                      const { data: fetchData, error: fetchErr } = await supabase
+                        .from("bookings")
+                        .select("guest_id")
+                        .eq("id", idToUse as any)
+                        .maybeSingle();
+                      if (fetchErr) {
+                        setCanceling(false);
+                        console.warn("ManageBooking: fetch owner error", fetchErr);
+                        Alert.alert(t("booking.cancel"), fetchErr.message);
+                        return;
+                      }
+                      if (!fetchData || fetchData.guest_id !== user.id) {
+                        setCanceling(false);
+                        console.warn("ManageBooking: permission denied or booking not found", fetchData);
+                        Alert.alert(t("booking.cancel"), t("booking.cancelNotAllowed") || "You are not allowed to cancel this booking.");
+                        return;
+                      }
+
+                      const { data, error } = await supabase
+                        .from("bookings")
+                        .delete()
+                        .eq("id", idToUse as any);
+                      setCanceling(false);
+                      console.log("ManageBooking: delete result", { data, error });
+                      if (error) {
+                        Alert.alert(t("booking.cancel"), error.message);
+                        return;
+                      }
+                      if (!data || (Array.isArray(data) && data.length === 0)) {
+                        Alert.alert(t("booking.cancel"), t("booking.cancelFailed") || "No booking was deleted.");
+                        return;
+                      }
+                      router.replace("/(tabs)/bookings");
+                    } catch (e: any) {
+                      setCanceling(false);
+                      Alert.alert(t("booking.cancel"), e?.message || String(e));
                     }
-                    router.replace("/(tabs)/bookings");
                   },
                 },
               ]);
