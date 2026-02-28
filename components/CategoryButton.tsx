@@ -1,5 +1,6 @@
 import { Pressable, Text, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { colors } from "../lib/theme";
 
 type CategoryButtonProps = {
   label: string;
@@ -22,7 +23,7 @@ export default function CategoryButton({
       <MaterialCommunityIcons
         name={icon as any}
         size={20}
-        color={selected ? "#fff" : "#111827"}
+        color={selected ? colors.background : colors.textPrimary}
       />
       <Text style={[styles.text, selected && styles.textSelected]}>
         {label}
@@ -35,21 +36,21 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: "#eee",
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 8,
     width: "30%",
     alignItems: "center",
     gap: 6,
   },
   buttonSelected: {
-    backgroundColor: "#111827",
+    backgroundColor: colors.textPrimary,
   },
   text: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#111827",
+    color: colors.textPrimary,
   },
   textSelected: {
-    color: "#fff",
+    color: colors.background,
   },
 });

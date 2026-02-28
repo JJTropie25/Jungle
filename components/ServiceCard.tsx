@@ -1,3 +1,5 @@
+import { colors } from "../lib/theme";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   View,
   Text,
@@ -20,6 +22,8 @@ type ServiceCardProps = {
   onPress?: () => void;
   containerStyle?: ViewStyle;
   imageStyle?: ImageStyle;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 };
 
 export default function ServiceCard({
@@ -33,8 +37,15 @@ export default function ServiceCard({
   onPress,
   containerStyle,
   imageStyle,
+  isFavorite,
+  onToggleFavorite,
 }: ServiceCardProps) {
   const Container = onPress ? Pressable : View;
+  const imageWrapStyle = [
+    styles.imageWrap,
+    horizontal && styles.imageWrapHorizontal,
+  ];
+
   return (
     <Container
       style={[
@@ -45,10 +56,25 @@ export default function ServiceCard({
       ]}
       onPress={onPress}
     >
-      <Image
-        source={imageSource}
-        style={[styles.image, horizontal && styles.imageHorizontal, imageStyle]}
-      />
+      <View style={imageWrapStyle}>
+        <Image
+          source={imageSource}
+          style={[
+            styles.image,
+            horizontal && styles.imageHorizontal,
+            imageStyle,
+          ]}
+        />
+        {onToggleFavorite && (
+          <Pressable style={styles.favoriteButton} onPress={onToggleFavorite}>
+            <MaterialCommunityIcons
+              name={isFavorite ? "star" : "star-outline"}
+              size={18}
+              color={isFavorite ? colors.accent : colors.textPrimary}
+            />
+          </Pressable>
+        )}
+      </View>
       <View style={horizontal && styles.content}>
         <Text style={styles.title}>{title}</Text>
         {meta ? <Text style={styles.meta}>{meta}</Text> : null}
@@ -62,10 +88,18 @@ export default function ServiceCard({
 const styles = StyleSheet.create({
   card: {
     width: 170,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: colors.background,
     borderRadius: 10,
     marginRight: 12,
     padding: 10,
+    overflow: "visible",
+    borderWidth: 1,
+    borderColor: "rgba(111,182,154,0.55)",
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   cardFull: {
     width: "100%",
@@ -76,17 +110,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  imageWrap: {
+    position: "relative",
+    width: "100%",
+  },
+  imageWrapHorizontal: {
+    width: 110,
+    flexShrink: 0,
+  },
   image: {
     width: "100%",
     height: 90,
     borderRadius: 8,
     marginBottom: 8,
-    backgroundColor: "#e5e7eb",
+    backgroundColor: colors.border,
   },
   imageHorizontal: {
-    width: "33%",
+    width: "100%",
     height: 90,
     marginBottom: 0,
+  },
+  favoriteButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
   },
   content: {
     flex: 1,
@@ -94,22 +147,23 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#111827",
+    color: colors.textPrimary,
   },
   meta: {
     fontSize: 12,
-    color: "#6b7280",
+    color: colors.textSecondary,
     marginTop: 4,
   },
   price: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#111827",
+    color: colors.textPrimary,
     marginTop: 4,
   },
   location: {
     fontSize: 12,
-    color: "#6b7280",
+    color: colors.textSecondary,
     marginTop: 2,
   },
 });
+

@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { colors } from "../lib/theme";
 
 type Action = {
   label: string;
@@ -33,7 +34,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 4,
     padding: 12,
-    backgroundColor: "#eee",
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 8,
     alignItems: "center",
     position: "relative",
@@ -45,6 +46,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#111827",
+    backgroundColor: colors.textPrimary,
   },
 });

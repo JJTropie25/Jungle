@@ -1,18 +1,31 @@
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Image } from "react-native";
+import { Image, Pressable } from "react-native";
 import { useI18n } from "../../lib/i18n";
 
 export default function TabsLayout() {
   const { t } = useI18n();
+  const router = useRouter();
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        sceneStyle: { backgroundColor: "transparent" },
+        tabBarStyle: { backgroundColor: "rgba(255,255,255,0.9)" },
+      }}
+    >
       <Tabs.Screen
         name="guest"
         options={{
           title: t("tabs.home"),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="home-variant" size={size} color={color} />
+          ),
+          tabBarButton: (props) => (
+            <Pressable
+              {...props}
+              onPress={() => router.replace("/(tabs)/guest")}
+            />
           ),
         }}
       />

@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import ResultsMap from "../../../components/ResultsMap";
+import { colors } from "../../../lib/theme";
 
 type Params = {
   microservice?: string;
@@ -60,7 +61,7 @@ export default function Directions() {
               style={styles.summaryBack}
               onPress={() => router.back()}
             >
-              <MaterialCommunityIcons name="arrow-left" size={20} color="#111827" />
+              <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
             <View style={styles.summaryLine}>
               <Text style={styles.summaryItem}>{microservice ?? "-"}</Text>
@@ -70,7 +71,7 @@ export default function Directions() {
               <Text style={styles.summaryItem}>{timeslot ?? "-"}</Text>
               <Text style={styles.summarySep}>|</Text>
               <View style={styles.summaryPeople}>
-                <MaterialCommunityIcons name="account-group" size={16} color="#111827" />
+                <MaterialCommunityIcons name="account-group" size={16} color={colors.textPrimary} />
                 <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
               </View>
             </View>
@@ -82,7 +83,7 @@ export default function Directions() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#fff" },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   mapContainer: { flex: 1 },
   mapTop: {
     position: "absolute",
@@ -92,13 +93,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   summaryBox: {
-    backgroundColor: "#f2f2f2",
+    backgroundColor: colors.surface,
     padding: 12,
     borderRadius: 10,
     marginBottom: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   summaryLine: {
     flex: 1,
@@ -110,10 +116,10 @@ const styles = StyleSheet.create({
   },
   summaryItem: {
     fontWeight: "600",
-    color: "#111827",
+    color: colors.textPrimary,
   },
   summarySep: {
-    color: "#9ca3af",
+    color: colors.textMuted,
     fontWeight: "600",
   },
   summaryPeople: {
@@ -128,8 +134,9 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#e5e7eb",
+    backgroundColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 });
+

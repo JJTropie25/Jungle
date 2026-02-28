@@ -2,8 +2,8 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
+  FlatList,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,11 +14,22 @@ import ResultsMap from "../../../components/ResultsMap";
 import Slider from "../../../components/UISlider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../../../lib/i18n";
+import { colors } from "../../../lib/theme";
+import {
+  fetchServices,
+  Service,
+  toDistanceLabel,
+  toPriceLabel,
+  toTypeKey,
+} from "../../../lib/services";
+import { useAuthState } from "../../../lib/auth";
+import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favorites";
 
 export default function SearchResults() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const { user } = useAuthState();
   const placeholderImage = require("../../../assets/images/react-logo.png");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
@@ -34,7 +45,8 @@ export default function SearchResults() {
   const [distanceMax, setDistanceMax] = useState(20);
   const [ratingMin, setRatingMin] = useState(5);
   const [isSliding, setIsSliding] = useState(false);
-  const mapScrollRef = useRef<ScrollView>(null);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const mapScrollRef = useRef<FlatList<Service>>(null);
   const CARD_WIDTH = 260;
   const CARD_GAP = 12;
   const CARD_SNAP = CARD_WIDTH + CARD_GAP;
@@ -47,99 +59,116 @@ export default function SearchResults() {
       microservice?: string;
     }>();
 
-  const results = [
-    {
-      title: "Doccia Centrale",
-      typeKey: "category.shower",
-      rating: 4.5,
-      distance: "300m",
-      price: "EUR 5",
-      location: "Roma, RM",
-      latitude: 41.9028,
-      longitude: 12.4964,
-    },
-    {
-      title: "Deposito Stazione",
-      typeKey: "category.storage",
-      rating: 4.2,
-      distance: "450m",
-      price: "EUR 8",
-      location: "Milano, MI",
-      latitude: 45.4642,
-      longitude: 9.19,
-    },
-    {
-      title: "Riposo Centro",
-      typeKey: "category.rest",
-      rating: 4.8,
-      distance: "200m",
-      price: "EUR 10",
-      location: "Firenze, FI",
-      latitude: 43.7696,
-      longitude: 11.2558,
-    },
-    {
-      title: "Doccia Porta Nuova",
-      typeKey: "category.shower",
-      rating: 4.4,
-      distance: "380m",
-      price: "EUR 6",
-      location: "Torino, TO",
-      latitude: 45.0703,
-      longitude: 7.6869,
-    },
-    {
-      title: "Deposito City Park",
-      typeKey: "category.storage",
-      rating: 4.1,
-      distance: "520m",
-      price: "EUR 4",
-      location: "Bologna, BO",
-      latitude: 44.4949,
-      longitude: 11.3426,
-    },
-    {
-      title: "Riposo Lungomare",
-      typeKey: "category.rest",
-      rating: 4.7,
-      distance: "260m",
-      price: "EUR 14",
-      location: "Napoli, NA",
-      latitude: 40.8518,
-      longitude: 14.2681,
-    },
-    {
-      title: "Doccia Universita",
-      typeKey: "category.shower",
-      rating: 4.0,
-      distance: "610m",
-      price: "EUR 5",
-      location: "Padova, PD",
-      latitude: 45.4064,
-      longitude: 11.8768,
-    },
-    {
-      title: "Deposito Centro Storico",
-      typeKey: "category.storage",
-      rating: 4.3,
-      distance: "430m",
-      price: "EUR 5",
-      location: "Verona, VR",
-      latitude: 45.4384,
-      longitude: 10.9916,
-    },
-    {
-      title: "Riposo Parco Nord",
-      typeKey: "category.rest",
-      rating: 4.6,
-      distance: "310m",
-      price: "EUR 12",
-      location: "Milano, MI",
-      latitude: 45.4782,
-      longitude: 9.2266,
-    },
-  ];
-  const resultsByIndex = useMemo(() => results, [results]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoadingServices(true);
+    fetchServices()
+      .then((data) => {
+        if (!isMounted) return;
+        setServices(data);
+        setLoadingServices(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setLoadingServices(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!user) {
+      setFavoriteIds(new Set());
+      return;
+    }
+    fetchFavoriteIds(user.id).then((ids) => {
+      if (!isMounted) return;
+      setFavoriteIds(ids);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const normalizedCategory = useMemo(() => {
+    if (!microservice) return null;
+    const value = String(microservice).toLowerCase();
+    if (value.includes("rest") || value.includes(t("category.rest").toLowerCase())) {
+      return "rest";
+    }
+    if (
+      value.includes("shower") ||
+      value.includes(t("category.shower").toLowerCase())
+    ) {
+      return "shower";
+    }
+    if (
+      value.includes("storage") ||
+      value.includes(t("category.storage").toLowerCase())
+    ) {
+      return "storage";
+    }
+    return null;
+  }, [microservice, t]);
+
+  const filteredResults = useMemo(() => {
+    let items = services;
+    if (normalizedCategory) {
+      items = items.filter((s) => s.category === normalizedCategory);
+    }
+    if (destination) {
+      const needle = destination.toLowerCase();
+      items = items.filter((s) => s.location.toLowerCase().includes(needle));
+    }
+    if (filterBy === "Price") {
+      items = items.filter((s) => s.price_eur <= priceMax);
+    }
+    if (filterBy === "Distance") {
+      items = items.filter(
+        (s) => (s.distance_meters ?? 0) <= distanceMax * 1000
+      );
+    }
+    if (filterBy === "Rating") {
+      items = items.filter((s) => (s.rating ?? 0) >= ratingMin);
+    }
+    if (sortBy === "priceUp") {
+      items = [...items].sort((a, b) => a.price_eur - b.price_eur);
+    } else if (sortBy === "priceDown") {
+      items = [...items].sort((a, b) => b.price_eur - a.price_eur);
+    } else if (sortBy === "topRated") {
+      items = [...items].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    } else if (sortBy === "nearest") {
+      items = [...items].sort(
+        (a, b) => (a.distance_meters ?? 0) - (b.distance_meters ?? 0)
+      );
+    }
+    return items;
+  }, [
+    services,
+    normalizedCategory,
+    destination,
+    filterBy,
+    priceMax,
+    distanceMax,
+    ratingMin,
+    sortBy,
+  ]);
+
+  const mapResults = useMemo(
+    () =>
+      filteredResults.filter(
+        (item) =>
+          typeof item.latitude === "number" &&
+          typeof item.longitude === "number"
+      ),
+    [filteredResults]
+  );
+  const resultsByIndex = useMemo(() => filteredResults, [filteredResults]);
 
   useEffect(() => {
     if (viewMode === "map" && !selectedTitle && resultsByIndex.length > 0) {
@@ -156,7 +185,7 @@ export default function SearchResults() {
       <Text style={styles.summaryItem}>{timeslot ?? "-"}</Text>
       <Text style={styles.summarySep}>|</Text>
       <View style={styles.summaryPeople}>
-        <MaterialCommunityIcons name="account-group" size={16} color="#111827" />
+        <MaterialCommunityIcons name="account-group" size={16} color={colors.textPrimary} />
         <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
       </View>
     </View>
@@ -219,7 +248,7 @@ export default function SearchResults() {
                 }}
                 onSlidingStart={() => setIsSliding(true)}
                 onSlidingComplete={() => setIsSliding(false)}
-                minimumTrackTintColor="#111827"
+                minimumTrackTintColor={colors.textPrimary}
               />
             </View>
           )}
@@ -239,7 +268,7 @@ export default function SearchResults() {
                 }}
                 onSlidingStart={() => setIsSliding(true)}
                 onSlidingComplete={() => setIsSliding(false)}
-                minimumTrackTintColor="#111827"
+                minimumTrackTintColor={colors.textPrimary}
               />
             </View>
           )}
@@ -259,7 +288,7 @@ export default function SearchResults() {
                 }}
                 onSlidingStart={() => setIsSliding(true)}
                 onSlidingComplete={() => setIsSliding(false)}
-                minimumTrackTintColor="#111827"
+                minimumTrackTintColor={colors.textPrimary}
               />
             </View>
           )}
@@ -280,7 +309,7 @@ export default function SearchResults() {
                   router.canGoBack() ? router.back() : router.replace("/(tabs)/guest")
                 }
               >
-                <MaterialCommunityIcons name="arrow-left" size={20} color="#111827" />
+                <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textPrimary} />
               </TouchableOpacity>
               <SummaryLine />
             </View>
@@ -308,26 +337,58 @@ export default function SearchResults() {
             <SortFilterMenus />
           </View>
 
-          <ScrollView
+          <FlatList
+            data={filteredResults}
+            keyExtractor={(item) => item.id}
             contentContainerStyle={styles.container}
             scrollEnabled={!isSliding && !sortOpen && !filterOpen}
-          >
-            {results.map((item) => (
+            initialNumToRender={8}
+            maxToRenderPerBatch={10}
+            windowSize={7}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>{t("search.noResults")}</Text>
+            }
+            renderItem={({ item }) => (
               <ServiceCard
-                key={item.title}
                 fullWidth
                 horizontal
                 containerStyle={styles.card}
                 imageStyle={styles.cardImage}
-                imageSource={placeholderImage}
+                imageSource={
+                  item.image_url ? { uri: item.image_url } : placeholderImage
+                }
                 title={item.title}
-                price={item.price}
+                price={toPriceLabel(item.price_eur)}
                 location={item.location}
-              meta={`${t(item.typeKey)} - ${item.distance} - ${t("label.rating")} ${item.rating}`}
+                meta={`${t(toTypeKey(item.category))} - ${toDistanceLabel(
+                  item.distance_meters
+                )} - ${t("label.rating")} ${item.rating ?? "-"}`}
+                isFavorite={favoriteIds.has(item.id)}
+                onToggleFavorite={async () => {
+                  if (!user) return;
+                  const next = new Set(favoriteIds);
+                  if (next.has(item.id)) {
+                    const { error } = await removeFavorite(user.id, item.id);
+                    if (error) {
+                      console.warn("remove favorite failed", error.message);
+                      return;
+                    }
+                    next.delete(item.id);
+                  } else {
+                    const { error } = await addFavorite(user.id, item.id);
+                    if (error) {
+                      console.warn("add favorite failed", error.message);
+                      return;
+                    }
+                    next.add(item.id);
+                  }
+                  setFavoriteIds(next);
+                }}
                 onPress={() =>
                   router.push({
                     pathname: "/(tabs)/guest/ServiceDetails",
                     params: {
+                      serviceId: item.id,
                       destination,
                       timeslot,
                       people,
@@ -336,25 +397,31 @@ export default function SearchResults() {
                   })
                 }
               />
-            ))}
-          </ScrollView>
+            )}
+          />
         </View>
       ) : (
         <View style={styles.mapContainer}>
-          <ResultsMap
-            results={results}
-            selectedTitle={selectedTitle}
-            onSelect={(title) => {
-              const index = resultsByIndex.findIndex((r) => r.title === title);
-              if (index >= 0) {
-                mapScrollRef.current?.scrollTo({
-                  x: index * CARD_SNAP,
-                  animated: true,
-                });
-              }
-              setSelectedTitle(title);
-            }}
-          />
+          {mapResults.length === 0 ? (
+            <View style={styles.emptyMap}>
+              <Text style={styles.emptyText}>{t("search.noResults")}</Text>
+            </View>
+          ) : (
+            <ResultsMap
+              results={mapResults}
+              selectedTitle={selectedTitle}
+              onSelect={(title) => {
+                const index = resultsByIndex.findIndex((r) => r.title === title);
+                if (index >= 0) {
+                  mapScrollRef.current?.scrollToOffset({
+                    offset: index * CARD_SNAP,
+                    animated: true,
+                  });
+                }
+                setSelectedTitle(title);
+              }}
+            />
+          )}
 
           <View style={[styles.mapTop, { paddingTop: insets.top + 12 }]}>
             <View style={styles.summaryBox}>
@@ -364,7 +431,7 @@ export default function SearchResults() {
                   router.canGoBack() ? router.back() : router.replace("/(tabs)/guest")
                 }
               >
-                <MaterialCommunityIcons name="arrow-left" size={20} color="#111827" />
+                <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textPrimary} />
               </TouchableOpacity>
               <SummaryLine />
             </View>
@@ -393,36 +460,65 @@ export default function SearchResults() {
           </View>
 
           <View style={styles.mapBottom}>
-            <ScrollView
+            <FlatList
               ref={mapScrollRef}
+              data={filteredResults}
+              keyExtractor={(item) => item.id}
               horizontal
               showsHorizontalScrollIndicator={false}
               snapToInterval={CARD_SNAP}
               decelerationRate="fast"
               snapToAlignment="start"
               contentContainerStyle={styles.mapCards}
+              initialNumToRender={6}
+              maxToRenderPerBatch={8}
+              windowSize={5}
               onMomentumScrollEnd={(e) => {
                 const x = e.nativeEvent.contentOffset.x;
                 const index = Math.round(x / CARD_SNAP);
                 const item = resultsByIndex[index];
                 if (item) setSelectedTitle(item.title);
               }}
-            >
-              {results.map((item) => (
+              renderItem={({ item }) => (
                 <ServiceCard
-                  key={item.title}
                   horizontal
                   containerStyle={styles.mapCard}
                   imageStyle={styles.mapCardImage}
-                  imageSource={placeholderImage}
+                  imageSource={
+                    item.image_url ? { uri: item.image_url } : placeholderImage
+                  }
                   title={item.title}
-                  price={item.price}
+                  price={toPriceLabel(item.price_eur)}
                   location={item.location}
-                  meta={`${t(item.typeKey)} - ${item.distance} - ${t("label.rating")} ${item.rating}`}
+                  meta={`${t(toTypeKey(item.category))} - ${toDistanceLabel(
+                    item.distance_meters
+                  )} - ${t("label.rating")} ${item.rating ?? "-"}`}
+                  isFavorite={favoriteIds.has(item.id)}
+                  onToggleFavorite={async () => {
+                    if (!user) return;
+                    const next = new Set(favoriteIds);
+                    if (next.has(item.id)) {
+                      const { error } = await removeFavorite(user.id, item.id);
+                      if (error) {
+                        console.warn("remove favorite failed", error.message);
+                        return;
+                      }
+                      next.delete(item.id);
+                    } else {
+                      const { error } = await addFavorite(user.id, item.id);
+                      if (error) {
+                        console.warn("add favorite failed", error.message);
+                        return;
+                      }
+                      next.add(item.id);
+                    }
+                    setFavoriteIds(next);
+                  }}
                   onPress={() =>
                     router.push({
                       pathname: "/(tabs)/guest/ServiceDetails",
                       params: {
+                        serviceId: item.id,
                         destination,
                         timeslot,
                         people,
@@ -431,8 +527,8 @@ export default function SearchResults() {
                     })
                   }
                 />
-              ))}
-            </ScrollView>
+              )}
+            />
           </View>
         </View>
       )}
@@ -441,25 +537,30 @@ export default function SearchResults() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#fff" },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   listWrap: { flex: 1 },
   listHeader: {
     paddingHorizontal: 16,
     paddingBottom: 4,
-    backgroundColor: "#fff",
+    backgroundColor: colors.background,
   },
   container: {
     padding: 16,
     paddingBottom: 24,
   },
   summaryBox: {
-    backgroundColor: "#f2f2f2",
+    backgroundColor: colors.surface,
     padding: 12,
     borderRadius: 10,
     marginBottom: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   summaryLine: {
     flex: 1,
@@ -471,10 +572,10 @@ const styles = StyleSheet.create({
   },
   summaryItem: {
     fontWeight: "600",
-    color: "#111827",
+    color: colors.textPrimary,
   },
   summarySep: {
-    color: "#9ca3af",
+    color: colors.textMuted,
     fontWeight: "600",
   },
   summaryPeople: {
@@ -489,11 +590,18 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#e5e7eb",
+    backgroundColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  card: { marginBottom: 12 },
+  card: {
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
+  },
   cardImage: { height: 90 },
   mapContainer: { flex: 1 },
   mapTop: {
@@ -515,28 +623,46 @@ const styles = StyleSheet.create({
   mapCardImage: { height: 80 },
   menuWrap: { gap: 8, marginBottom: 8 },
   menuBox: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.background,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   menuItem: {
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    borderBottomColor: colors.surfaceSoft,
   },
-  menuText: { color: "#111827", fontWeight: "600" },
+  menuText: { color: colors.textPrimary, fontWeight: "600" },
   sliderBox: {
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "#f3f4f6",
+    borderTopColor: colors.surfaceSoft,
   },
   sliderLabel: {
     fontWeight: "600",
     marginBottom: 6,
-    color: "#111827",
+    color: colors.textPrimary,
+  },
+  emptyText: {
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginTop: 24,
+    fontWeight: "600",
+  },
+  emptyMap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f8fafc",
   },
 });
+

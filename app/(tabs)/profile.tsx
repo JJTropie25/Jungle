@@ -1,27 +1,84 @@
-import { View, Text, StyleSheet, Image, Pressable, Alert } from "react-native";
+import { View, Text, StyleSheet, Image, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { useI18n } from "../../lib/i18n";
+import { supabase } from "../../lib/supabase";
+import { useAuthState } from "../../lib/auth";
+import { useEffect, useState } from "react";
+import { colors } from "../../lib/theme";
+import { useAppDialog } from "../../components/AppDialogProvider";
 
 export default function Profile() {
   const router = useRouter();
   const { t } = useI18n();
+  const dialog = useAppDialog();
+  const { user } = useAuthState();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const handleLogout = async () => {
+    if (!supabase) {
+      await dialog.alert(
+        t("profile.logout"),
+        "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      return;
+    }
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      await dialog.alert(t("profile.logout"), error.message);
+      return;
+    }
+    await dialog.alert(t("profile.logout"), t("profile.logoutSuccess"));
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!supabase || !user) return;
+    supabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (!isMounted) return;
+        if (data?.avatar_url) setAvatarUrl(data.avatar_url);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Image
-          source={require("../../assets/images/icon.png")}
+          source={
+            avatarUrl ? { uri: avatarUrl } : require("../../assets/images/icon.png")
+          }
           style={styles.avatar}
         />
-        <Text style={styles.username}>@username</Text>
+        <Text style={styles.username}>
+          {user?.user_metadata?.username
+            ? `@${user.user_metadata.username}`
+            : user?.email
+            ? user.email
+            : "@guest"}
+        </Text>
       </View>
 
       <View style={styles.actions}>
-        <Pressable
-          style={styles.primaryButton}
-          onPress={() => router.push("/(tabs)/profile/Edit")}
-        >
-          <Text style={styles.primaryButtonText}>{t("profile.editInfo")}</Text>
-        </Pressable>
+        {user ? (
+          <Pressable
+            style={styles.primaryButton}
+            onPress={() => router.push("/(tabs)/profile/Edit")}
+          >
+            <Text style={styles.primaryButtonText}>{t("profile.editInfo")}</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            style={styles.primaryButton}
+            onPress={() => router.push("/(auth)/sign-in")}
+          >
+            <Text style={styles.primaryButtonText}>{t("auth.signInAction")}</Text>
+          </Pressable>
+        )}
         <Pressable
           style={styles.secondaryButton}
           onPress={() => router.push("/(tabs)/profile/Language")}
@@ -30,14 +87,11 @@ export default function Profile() {
             {t("profile.changeLanguage")}
           </Text>
         </Pressable>
-        <Pressable
-          style={styles.secondaryButton}
-          onPress={() =>
-            Alert.alert(t("profile.logout"), t("profile.logoutNotImplemented"))
-          }
-        >
-          <Text style={styles.secondaryButtonText}>{t("profile.logout")}</Text>
-        </Pressable>
+        {user ? (
+          <Pressable style={styles.secondaryButton} onPress={handleLogout}>
+            <Text style={styles.secondaryButtonText}>{t("profile.logout")}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -50,7 +104,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     paddingTop: 48,
     paddingHorizontal: 24,
-    backgroundColor: "#fff",
+    backgroundColor: colors.screenBackground,
   },
   header: {
     alignItems: "center",
@@ -62,36 +116,36 @@ const styles = StyleSheet.create({
     borderRadius: 48,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
   },
   username: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#111827",
+    color: colors.textPrimary,
   },
   actions: {
     width: "100%",
     gap: 12,
   },
   primaryButton: {
-    backgroundColor: "#111827",
+    backgroundColor: colors.textPrimary,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
   },
   primaryButtonText: {
-    color: "#fff",
+    color: colors.background,
     fontSize: 16,
     fontWeight: "600",
   },
   secondaryButton: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.surfaceSoft,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
   },
   secondaryButtonText: {
-    color: "#111827",
+    color: colors.textPrimary,
     fontSize: 16,
     fontWeight: "600",
   },
