@@ -176,7 +176,7 @@ export default function Bookings() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   container: { padding: 16, paddingBottom: 24 },
   title: {
     fontSize: 20,
@@ -191,6 +191,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   cardImage: {
     width: "100%",
@@ -248,3 +253,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+

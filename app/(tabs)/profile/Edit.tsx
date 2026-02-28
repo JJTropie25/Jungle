@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,11 +15,13 @@ import { useAuthState } from "../../../lib/auth";
 import { useEffect, useState } from "react";
 import * as ImagePicker from "expo-image-picker";
 import { colors } from "../../../lib/theme";
+import { useAppDialog } from "../../../components/AppDialogProvider";
 
 export default function EditProfile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const dialog = useAppDialog();
   const { user } = useAuthState();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -59,7 +60,7 @@ export default function EditProfile() {
 
   const handlePickPhoto = async () => {
     if (!user || !supabase) {
-      Alert.alert(
+      await dialog.alert(
         t("edit.changePhoto"),
         "Sign in and configure Supabase to upload a photo."
       );
@@ -67,7 +68,7 @@ export default function EditProfile() {
     }
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(t("edit.changePhoto"), "Permission denied.");
+      await dialog.alert(t("edit.changePhoto"), "Permission denied.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -90,7 +91,7 @@ export default function EditProfile() {
         contentType: asset.mimeType ?? "image/jpeg",
       });
     if (error) {
-      Alert.alert(t("edit.changePhoto"), error.message);
+      await dialog.alert(t("edit.changePhoto"), error.message);
       return;
     }
     const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
@@ -104,7 +105,7 @@ export default function EditProfile() {
 
   const handleSave = async () => {
     if (!supabase) {
-      Alert.alert(
+      await dialog.alert(
         t("edit.saveChanges"),
         "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
       );
@@ -133,16 +134,16 @@ export default function EditProfile() {
     const { error } = await supabase.auth.updateUser(updates);
     setSaving(false);
     if (error) {
-      Alert.alert(t("edit.saveChanges"), error.message);
+      await dialog.alert(t("edit.saveChanges"), error.message);
       return;
     }
-    Alert.alert(t("edit.saveChanges"), t("edit.saved"));
+    await dialog.alert(t("edit.saveChanges"), t("edit.saved"));
     router.replace("/(tabs)/profile");
   };
 
   return (
     <SafeAreaView style={styles.screen}>
-      <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+      <View style={[styles.container, { paddingTop: insets.top + 16 }]}> 
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.replace("/(tabs)/profile")}
@@ -208,7 +209,7 @@ export default function EditProfile() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   container: {
     paddingHorizontal: 24,
   },

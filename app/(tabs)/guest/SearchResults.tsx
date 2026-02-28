@@ -2,8 +2,8 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
+  FlatList,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -46,7 +46,7 @@ export default function SearchResults() {
   const [ratingMin, setRatingMin] = useState(5);
   const [isSliding, setIsSliding] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
-  const mapScrollRef = useRef<ScrollView>(null);
+  const mapScrollRef = useRef<FlatList<Service>>(null);
   const CARD_WIDTH = 260;
   const CARD_GAP = 12;
   const CARD_SNAP = CARD_WIDTH + CARD_GAP;
@@ -337,58 +337,68 @@ export default function SearchResults() {
             <SortFilterMenus />
           </View>
 
-          <ScrollView
+          <FlatList
+            data={filteredResults}
+            keyExtractor={(item) => item.id}
             contentContainerStyle={styles.container}
             scrollEnabled={!isSliding && !sortOpen && !filterOpen}
-          >
-            {filteredResults.length === 0 ? (
+            initialNumToRender={8}
+            maxToRenderPerBatch={10}
+            windowSize={7}
+            ListEmptyComponent={
               <Text style={styles.emptyText}>{t("search.noResults")}</Text>
-            ) : (
-              filteredResults.map((item) => (
-                <ServiceCard
-                  key={item.id}
-                  fullWidth
-                  horizontal
-                  containerStyle={styles.card}
-                  imageStyle={styles.cardImage}
-                  imageSource={
-                    item.image_url ? { uri: item.image_url } : placeholderImage
-                  }
-                  title={item.title}
-                  price={toPriceLabel(item.price_eur)}
-                  location={item.location}
-                  meta={`${t(toTypeKey(item.category))} - ${toDistanceLabel(
-                    item.distance_meters
-                  )} - ${t("label.rating")} ${item.rating ?? "-"}`}
-                  isFavorite={favoriteIds.has(item.id)}
-                  onToggleFavorite={async () => {
-                    if (!user) return;
-                    const next = new Set(favoriteIds);
-                    if (next.has(item.id)) {
-                      await removeFavorite(user.id, item.id);
-                      next.delete(item.id);
-                    } else {
-                      await addFavorite(user.id, item.id);
-                      next.add(item.id);
+            }
+            renderItem={({ item }) => (
+              <ServiceCard
+                fullWidth
+                horizontal
+                containerStyle={styles.card}
+                imageStyle={styles.cardImage}
+                imageSource={
+                  item.image_url ? { uri: item.image_url } : placeholderImage
+                }
+                title={item.title}
+                price={toPriceLabel(item.price_eur)}
+                location={item.location}
+                meta={`${t(toTypeKey(item.category))} - ${toDistanceLabel(
+                  item.distance_meters
+                )} - ${t("label.rating")} ${item.rating ?? "-"}`}
+                isFavorite={favoriteIds.has(item.id)}
+                onToggleFavorite={async () => {
+                  if (!user) return;
+                  const next = new Set(favoriteIds);
+                  if (next.has(item.id)) {
+                    const { error } = await removeFavorite(user.id, item.id);
+                    if (error) {
+                      console.warn("remove favorite failed", error.message);
+                      return;
                     }
-                    setFavoriteIds(next);
-                  }}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/(tabs)/guest/ServiceDetails",
-                      params: {
-                        serviceId: item.id,
-                        destination,
-                        timeslot,
-                        people,
-                        microservice: item.title,
-                      },
-                    })
+                    next.delete(item.id);
+                  } else {
+                    const { error } = await addFavorite(user.id, item.id);
+                    if (error) {
+                      console.warn("add favorite failed", error.message);
+                      return;
+                    }
+                    next.add(item.id);
                   }
-                />
-              ))
+                  setFavoriteIds(next);
+                }}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(tabs)/guest/ServiceDetails",
+                    params: {
+                      serviceId: item.id,
+                      destination,
+                      timeslot,
+                      people,
+                      microservice: item.title,
+                    },
+                  })
+                }
+              />
             )}
-          </ScrollView>
+          />
         </View>
       ) : (
         <View style={styles.mapContainer}>
@@ -403,8 +413,8 @@ export default function SearchResults() {
               onSelect={(title) => {
                 const index = resultsByIndex.findIndex((r) => r.title === title);
                 if (index >= 0) {
-                  mapScrollRef.current?.scrollTo({
-                    x: index * CARD_SNAP,
+                  mapScrollRef.current?.scrollToOffset({
+                    offset: index * CARD_SNAP,
                     animated: true,
                   });
                 }
@@ -450,24 +460,27 @@ export default function SearchResults() {
           </View>
 
           <View style={styles.mapBottom}>
-            <ScrollView
+            <FlatList
               ref={mapScrollRef}
+              data={filteredResults}
+              keyExtractor={(item) => item.id}
               horizontal
               showsHorizontalScrollIndicator={false}
               snapToInterval={CARD_SNAP}
               decelerationRate="fast"
               snapToAlignment="start"
               contentContainerStyle={styles.mapCards}
+              initialNumToRender={6}
+              maxToRenderPerBatch={8}
+              windowSize={5}
               onMomentumScrollEnd={(e) => {
                 const x = e.nativeEvent.contentOffset.x;
                 const index = Math.round(x / CARD_SNAP);
                 const item = resultsByIndex[index];
                 if (item) setSelectedTitle(item.title);
               }}
-            >
-              {filteredResults.map((item) => (
+              renderItem={({ item }) => (
                 <ServiceCard
-                  key={item.id}
                   horizontal
                   containerStyle={styles.mapCard}
                   imageStyle={styles.mapCardImage}
@@ -485,10 +498,18 @@ export default function SearchResults() {
                     if (!user) return;
                     const next = new Set(favoriteIds);
                     if (next.has(item.id)) {
-                      await removeFavorite(user.id, item.id);
+                      const { error } = await removeFavorite(user.id, item.id);
+                      if (error) {
+                        console.warn("remove favorite failed", error.message);
+                        return;
+                      }
                       next.delete(item.id);
                     } else {
-                      await addFavorite(user.id, item.id);
+                      const { error } = await addFavorite(user.id, item.id);
+                      if (error) {
+                        console.warn("add favorite failed", error.message);
+                        return;
+                      }
                       next.add(item.id);
                     }
                     setFavoriteIds(next);
@@ -506,8 +527,8 @@ export default function SearchResults() {
                     })
                   }
                 />
-              ))}
-            </ScrollView>
+              )}
+            />
           </View>
         </View>
       )}
@@ -516,7 +537,7 @@ export default function SearchResults() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   listWrap: { flex: 1 },
   listHeader: {
     paddingHorizontal: 16,
@@ -535,6 +556,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   summaryLine: {
     flex: 1,
@@ -568,7 +594,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  card: { marginBottom: 12 },
+  card: {
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
+  },
   cardImage: { height: 90 },
   mapContainer: { flex: 1 },
   mapTop: {
@@ -595,6 +628,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   menuItem: {
     paddingVertical: 10,
@@ -627,3 +665,4 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
   },
 });
+

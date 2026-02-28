@@ -88,10 +88,18 @@ export default function ServiceCard({
 const styles = StyleSheet.create({
   card: {
     width: 170,
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: colors.background,
     borderRadius: 10,
     marginRight: 12,
     padding: 10,
+    overflow: "visible",
+    borderWidth: 1,
+    borderColor: "rgba(111,182,154,0.55)",
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   cardFull: {
     width: "100%",
@@ -158,3 +166,4 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
+

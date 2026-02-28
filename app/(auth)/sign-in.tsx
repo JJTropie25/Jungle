@@ -5,23 +5,25 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "../../lib/supabase";
 import { useI18n } from "../../lib/i18n";
 import { colors } from "../../lib/theme";
+import { useAppDialog } from "../../components/AppDialogProvider";
 
 export default function SignIn() {
   const router = useRouter();
   const { t } = useI18n();
+  const dialog = useAppDialog();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const handleSignIn = async () => {
     if (!supabase) {
-      Alert.alert(
+      await dialog.alert(
         t("auth.signInTitle"),
         "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
       );
@@ -34,10 +36,34 @@ export default function SignIn() {
     });
     setLoading(false);
     if (error) {
-      Alert.alert(t("auth.signInTitle"), error.message);
+      await dialog.alert(t("auth.signInTitle"), error.message);
       return;
     }
     router.replace("/(tabs)/guest");
+  };
+
+  const handleForgotPassword = async () => {
+    if (!supabase) {
+      await dialog.alert(
+        t("auth.signInTitle"),
+        "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      return;
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      await dialog.alert(t("auth.resetPasswordTitle"), t("auth.resetPasswordEnterEmail"));
+      return;
+    }
+
+    setResettingPassword(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+    setResettingPassword(false);
+    if (error) {
+      await dialog.alert(t("auth.resetPasswordTitle"), error.message);
+      return;
+    }
+    await dialog.alert(t("auth.resetPasswordTitle"), t("auth.resetPasswordSent"));
   };
 
   return (
@@ -70,6 +96,17 @@ export default function SignIn() {
             {loading ? t("auth.loading") : t("auth.signInAction")}
           </Text>
         </Pressable>
+        <Pressable
+          onPress={handleForgotPassword}
+          disabled={resettingPassword}
+          style={styles.secondaryAction}
+        >
+          <Text style={styles.link}>
+            {resettingPassword
+              ? t("auth.loading")
+              : t("auth.forgotPasswordAction")}
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.footer}>
@@ -85,7 +122,7 @@ export default function SignIn() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.screenBackground,
     paddingHorizontal: 24,
     paddingTop: 80,
   },
@@ -138,5 +175,9 @@ const styles = StyleSheet.create({
   link: {
     color: colors.textPrimary,
     fontWeight: "600",
+  },
+  secondaryAction: {
+    alignSelf: "flex-start",
+    marginTop: 4,
   },
 });

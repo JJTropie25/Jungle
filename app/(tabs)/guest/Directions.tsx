@@ -83,7 +83,7 @@ export default function Directions() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   mapContainer: { flex: 1 },
   mapTop: {
     position: "absolute",
@@ -100,6 +100,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   summaryLine: {
     flex: 1,
@@ -134,3 +139,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
+

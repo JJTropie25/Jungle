@@ -5,16 +5,17 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "../../lib/supabase";
 import { useI18n } from "../../lib/i18n";
 import { colors } from "../../lib/theme";
+import { useAppDialog } from "../../components/AppDialogProvider";
 
 export default function SignUp() {
   const router = useRouter();
   const { t } = useI18n();
+  const dialog = useAppDialog();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,7 +23,7 @@ export default function SignUp() {
 
   const handleSignUp = async () => {
     if (!supabase) {
-      Alert.alert(
+      await dialog.alert(
         t("auth.signUpTitle"),
         "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
       );
@@ -40,10 +41,15 @@ export default function SignUp() {
     });
     setLoading(false);
     if (error) {
-      Alert.alert(t("auth.signUpTitle"), error.message);
+      const msg = (error.message || "").toLowerCase();
+      if (msg.includes("already") && msg.includes("registered")) {
+        await dialog.alert(t("auth.signUpTitle"), t("auth.emailAlreadyRegistered"));
+        return;
+      }
+      await dialog.alert(t("auth.signUpTitle"), error.message);
       return;
     }
-    Alert.alert(t("auth.checkEmail"), t("auth.checkEmailDetail"));
+    await dialog.alert(t("auth.checkEmail"), t("auth.checkEmailDetail"));
     router.replace("/(auth)/sign-in");
   };
 
@@ -99,7 +105,7 @@ export default function SignUp() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.screenBackground,
     paddingHorizontal: 24,
     paddingTop: 80,
   },

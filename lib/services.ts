@@ -16,12 +16,22 @@ export type Service = {
   section?: string | null;
 };
 
-export async function fetchServices(): Promise<Service[]> {
+type FetchServicesOptions = {
+  limit?: number;
+};
+
+export async function fetchServices(
+  options?: FetchServicesOptions
+): Promise<Service[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase
+  let query = supabase
     .from("services")
     .select("*")
     .order("created_at", { ascending: false });
+  if (options?.limit && options.limit > 0) {
+    query = query.limit(options.limit);
+  }
+  const { data, error } = await query;
   if (error || !data) return [];
   return data as Service[];
 }

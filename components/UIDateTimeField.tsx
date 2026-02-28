@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -38,6 +38,10 @@ export default function UIDateTimeField({
 }: Props) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => new Date());
+  const hourRef = useRef<ScrollView>(null);
+  const minuteRef = useRef<ScrollView>(null);
+  const wheelItemHeight = 52;
+  const wheelRepeat = 5;
   const icon = mode === "date" ? "calendar-month" : "clock-outline";
   const selectedDate = useMemo(() => {
     if (!value || mode !== "date") return null;
@@ -60,6 +64,39 @@ export default function UIDateTimeField({
       m: minutes.includes(m) ? m : "00",
     };
   }, [hours, minutes, mode, value]);
+  const cyclicHours = useMemo(
+    () =>
+      Array.from(
+        { length: hours.length * wheelRepeat },
+        (_, i) => hours[i % hours.length]
+      ),
+    [hours]
+  );
+  const cyclicMinutes = useMemo(
+    () =>
+      Array.from(
+        { length: minutes.length * wheelRepeat },
+        (_, i) => minutes[i % minutes.length]
+      ),
+    [minutes]
+  );
+
+  useEffect(() => {
+    if (!open || mode !== "time") return;
+    const hourIndex = hours.indexOf(selectedTime.h);
+    const minuteIndex = minutes.indexOf(selectedTime.m);
+    const centerBlock = Math.floor(wheelRepeat / 2);
+    setTimeout(() => {
+      hourRef.current?.scrollTo({
+        y: Math.max(0, centerBlock * hours.length + hourIndex) * wheelItemHeight,
+        animated: false,
+      });
+      minuteRef.current?.scrollTo({
+        y: Math.max(0, centerBlock * minutes.length + minuteIndex) * wheelItemHeight,
+        animated: false,
+      });
+    }, 0);
+  }, [hours, minutes, mode, open, selectedTime.h, selectedTime.m]);
 
   const monthLabel = useMemo(() => {
     const month = viewDate.toLocaleString("default", { month: "long" });
@@ -99,7 +136,8 @@ export default function UIDateTimeField({
         animationType="fade"
         statusBarTranslucent
       >
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
+        <View style={styles.backdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={styles.modalCard}>
             {mode === "date" ? (
               <View>
@@ -182,55 +220,86 @@ export default function UIDateTimeField({
             ) : (
               <View>
                 <Text style={styles.timeTitle}>Select time</Text>
-                <View style={styles.timeColumns}>
-                  <ScrollView
-                    style={styles.timeList}
-                    showsVerticalScrollIndicator={false}
-                  >
-                    {hours.map((h) => (
-                      <Pressable
-                        key={h}
-                        style={[
-                          styles.timeOption,
-                          selectedTime.h === h && styles.timeSelected,
-                        ]}
-                        onPress={() => onChange(`${h}:${selectedTime.m}`)}
+                <View style={styles.timeWheelWrap}>
+                  <View style={styles.timeColumns}>
+                    <View style={styles.timeWheelBox}>
+                      <ScrollView
+                        ref={hourRef}
+                        style={styles.timeWheel}
+                        contentContainerStyle={styles.timeWheelContent}
+                        showsVerticalScrollIndicator={false}
+                        nestedScrollEnabled
+                        snapToInterval={wheelItemHeight}
+                        decelerationRate="fast"
+                        onMomentumScrollEnd={(e) => {
+                          const offsetY = e.nativeEvent.contentOffset.y;
+                          const rawIndex = Math.round(offsetY / wheelItemHeight);
+                          const normalized =
+                            ((rawIndex % hours.length) + hours.length) % hours.length;
+                          onChange(`${hours[normalized]}:${selectedTime.m}`);
+                          if (
+                            rawIndex < hours.length ||
+                            rawIndex > hours.length * (wheelRepeat - 1)
+                          ) {
+                            const centerBlock = Math.floor(wheelRepeat / 2);
+                            const recentered =
+                              (centerBlock * hours.length + normalized) * wheelItemHeight;
+                            requestAnimationFrame(() => {
+                              hourRef.current?.scrollTo({ y: recentered, animated: false });
+                            });
+                          }
+                        }}
                       >
-                        <Text
-                          style={[
-                            styles.timeLabel,
-                            selectedTime.h === h && styles.timeLabelSelected,
-                          ]}
-                        >
-                          {h}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                  <ScrollView
-                    style={styles.timeList}
-                    showsVerticalScrollIndicator={false}
-                  >
-                    {minutes.map((m) => (
-                      <Pressable
-                        key={m}
-                        style={[
-                          styles.timeOption,
-                          selectedTime.m === m && styles.timeSelected,
-                        ]}
-                        onPress={() => onChange(`${selectedTime.h}:${m}`)}
+                        {cyclicHours.map((h, i) => (
+                          <View key={`${h}-${i}`} style={styles.timeWheelItem}>
+                            <Text style={styles.timeLabel}>
+                              {h}
+                            </Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                      <View pointerEvents="none" style={styles.timeCenterHighlight} />
+                    </View>
+                    <Text style={styles.timeSeparator}>:</Text>
+                    <View style={styles.timeWheelBox}>
+                      <ScrollView
+                        ref={minuteRef}
+                        style={styles.timeWheel}
+                        contentContainerStyle={styles.timeWheelContent}
+                        showsVerticalScrollIndicator={false}
+                        nestedScrollEnabled
+                        snapToInterval={wheelItemHeight}
+                        decelerationRate="fast"
+                        onMomentumScrollEnd={(e) => {
+                          const offsetY = e.nativeEvent.contentOffset.y;
+                          const rawIndex = Math.round(offsetY / wheelItemHeight);
+                          const normalized =
+                            ((rawIndex % minutes.length) + minutes.length) % minutes.length;
+                          onChange(`${selectedTime.h}:${minutes[normalized]}`);
+                          if (
+                            rawIndex < minutes.length ||
+                            rawIndex > minutes.length * (wheelRepeat - 1)
+                          ) {
+                            const centerBlock = Math.floor(wheelRepeat / 2);
+                            const recentered =
+                              (centerBlock * minutes.length + normalized) * wheelItemHeight;
+                            requestAnimationFrame(() => {
+                              minuteRef.current?.scrollTo({ y: recentered, animated: false });
+                            });
+                          }
+                        }}
                       >
-                        <Text
-                          style={[
-                            styles.timeLabel,
-                            selectedTime.m === m && styles.timeLabelSelected,
-                          ]}
-                        >
-                          {m}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                        {cyclicMinutes.map((m, i) => (
+                          <View key={`${m}-${i}`} style={styles.timeWheelItem}>
+                            <Text style={styles.timeLabel}>
+                              {m}
+                            </Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                      <View pointerEvents="none" style={styles.timeCenterHighlight} />
+                    </View>
+                  </View>
                 </View>
                 <Pressable
                   style={styles.done}
@@ -241,7 +310,7 @@ export default function UIDateTimeField({
               </View>
             )}
           </View>
-        </Pressable>
+        </View>
       </Modal>
     </View>
   );
@@ -330,27 +399,61 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: 12,
   },
-  timeList: {
-    maxHeight: 260,
-  },
   timeColumns: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
+    alignItems: "center",
+    zIndex: 1,
   },
-  timeOption: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+  timeWheelWrap: {
+    position: "relative",
+    alignSelf: "center",
+  },
+  timeWheelBox: {
+    position: "relative",
+    width: 82,
+    height: 156,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: colors.background,
+  },
+  timeWheel: {
+    height: "100%",
+    width: "100%",
+    backgroundColor: "transparent",
+    zIndex: 2,
+  },
+  timeWheelContent: {
+    paddingVertical: 52,
+  },
+  timeWheelItem: {
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 8,
+    backgroundColor: "transparent",
+    opacity: 1,
+    zIndex: 3,
   },
-  timeSelected: {
-    backgroundColor: colors.textPrimary,
+  timeSeparator: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.textPrimary,
   },
   timeLabel: {
-    color: colors.textPrimary,
+    color: "#111111",
     fontWeight: "600",
   },
-  timeLabelSelected: {
-    color: colors.background,
+  timeCenterHighlight: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceSoft,
+    opacity: 1,
+    zIndex: 1,
   },
   done: {
     marginTop: 12,

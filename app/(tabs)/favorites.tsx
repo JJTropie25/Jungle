@@ -1,14 +1,20 @@
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { Text, StyleSheet, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import ServiceCard from "../../components/ServiceCard";
 import { useI18n } from "../../lib/i18n";
 import { colors } from "../../lib/theme";
 import { useAuthState } from "../../lib/auth";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../lib/favorites";
+import {
+  addFavorite,
+  fetchFavoriteIds,
+  fetchFavoriteServices,
+  removeFavorite,
+} from "../../lib/favorites";
 import { toPriceLabel, toTypeKey } from "../../lib/services";
+import { useFocusEffect } from "@react-navigation/native";
 
 export default function Favorites() {
   const router = useRouter();
@@ -20,31 +26,37 @@ export default function Favorites() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadFavorites = useCallback(async (isMounted: () => boolean) => {
     if (!supabase || !user) {
+      if (!isMounted()) return;
+      setFavoriteIds(new Set());
+      setItems([]);
       setLoading(false);
       return;
     }
+
+    if (!isMounted()) return;
     setLoading(true);
-    Promise.all([
+    const [ids, services] = await Promise.all([
       fetchFavoriteIds(user.id),
-      supabase
-        .from("favorites")
-        .select(
-          "service:services(id, title, category, price_eur, location, distance_meters, rating, image_url)"
-        )
-        .eq("guest_id", user.id),
-    ]).then(([ids, res]) => {
-      if (!isMounted) return;
-      setFavoriteIds(ids);
-      setItems(res.data?.map((row: any) => row.service) ?? []);
-      setLoading(false);
-    });
-    return () => {
-      isMounted = false;
-    };
+      fetchFavoriteServices(user.id),
+    ]);
+    if (!isMounted()) return;
+    setFavoriteIds(ids);
+    setItems(services);
+    setLoading(false);
   }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      const isMounted = () => mounted;
+      loadFavorites(isMounted);
+      return () => {
+        mounted = false;
+      };
+    }, [loadFavorites])
+  );
 
   const emptyText = useMemo(() => {
     if (!user) return t("favorites.signIn");
@@ -84,10 +96,12 @@ export default function Favorites() {
                 if (!user) return;
                 const next = new Set(favoriteIds);
                 if (next.has(item.id)) {
-                  await removeFavorite(user.id, item.id);
+                  const { error } = await removeFavorite(user.id, item.id);
+                  if (error) return;
                   next.delete(item.id);
                 } else {
-                  await addFavorite(user.id, item.id);
+                  const { error } = await addFavorite(user.id, item.id);
+                  if (error) return;
                   next.add(item.id);
                 }
                 setFavoriteIds(next);
@@ -114,7 +128,7 @@ export default function Favorites() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   container: { padding: 16, paddingBottom: 24 },
   title: {
     fontSize: 20,

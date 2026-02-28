@@ -5,14 +5,19 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  FlatList,
+  Image,
 } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Location from "expo-location";
+import { useFocusEffect } from "@react-navigation/native";
 import ServiceCard from "../../../components/ServiceCard";
 import CategoryButton from "../../../components/CategoryButton";
 import UIDateTimeField from "../../../components/UIDateTimeField";
+import UIWheelSelectField from "../../../components/UIWheelSelectField";
 import { useI18n } from "../../../lib/i18n";
 import { colors } from "../../../lib/theme";
 import {
@@ -23,6 +28,7 @@ import {
 } from "../../../lib/services";
 import { useAuthState } from "../../../lib/auth";
 import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favorites";
+import { getRecentlyViewedIds } from "../../../lib/recentlyViewed";
 
 export default function GuestHome() {
   const router = useRouter();
@@ -35,18 +41,22 @@ export default function GuestHome() {
   const [time, setTime] = useState("");
   const [people, setPeople] = useState("");
   const [microservice, setMicroservice] = useState("");
-  const [peopleOpen, setPeopleOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const placeholderImage = require("../../../assets/images/react-logo.png");
   const [services, setServices] = useState<Service[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const categories = [
     { label: t("category.rest"), icon: "bed-king" },
     { label: t("category.shower"), icon: "shower" },
     { label: t("category.storage"), icon: "locker" },
   ];
+  const logoModule = require("../../../assets/images/Jungle_Logo_Green.svg") as any;
+  const Logo = (logoModule?.default ?? logoModule) as any;
+  const canRenderSvg = typeof Logo === "function" || typeof Logo === "object";
 
   useEffect(() => {
     let isMounted = true;
@@ -81,14 +91,84 @@ export default function GuestHome() {
     };
   }, [user]);
 
-  const recentlyViewed = useMemo(
-    () => services.filter((s) => s.section === "recently"),
-    [services],
+  useFocusEffect(
+    useMemo(
+      () => () => {
+        let mounted = true;
+        getRecentlyViewedIds(user?.id).then((ids) => {
+          if (!mounted) return;
+          setRecentIds(ids);
+        });
+        return () => {
+          mounted = false;
+        };
+      },
+      [user?.id]
+    )
   );
-  const aroundYou = useMemo(
-    () => services.filter((s) => s.section === "around"),
-    [services],
-  );
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadLocation = async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      if (!isMounted) return;
+      setUserCoords({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+    };
+    loadLocation().catch(() => null);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const recentlyViewed = useMemo(() => {
+    if (services.length === 0) return [];
+    const byId = new Map(services.map((s) => [s.id, s]));
+    const ordered = recentIds
+      .map((id) => byId.get(id))
+      .filter((item): item is Service => Boolean(item));
+    if (ordered.length > 0) return ordered.slice(0, 10);
+    const shuffled = [...services].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 10);
+  }, [recentIds, services]);
+
+  const aroundYou = useMemo(() => {
+    if (services.length === 0) return [];
+    if (!userCoords) {
+      const shuffled = [...services].sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, 10);
+    }
+    const withCoords = services.filter(
+      (s) => typeof s.latitude === "number" && typeof s.longitude === "number"
+    );
+    if (withCoords.length === 0) {
+      const shuffled = [...services].sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, 10);
+    }
+    return [...withCoords]
+      .sort(
+        (a, b) =>
+          haversineMeters(
+            userCoords.latitude,
+            userCoords.longitude,
+            a.latitude as number,
+            a.longitude as number
+          ) -
+          haversineMeters(
+            userCoords.latitude,
+            userCoords.longitude,
+            b.latitude as number,
+            b.longitude as number
+          )
+      )
+      .slice(0, 10);
+  }, [services, userCoords]);
   const locationSuggestions = useMemo(() => {
     const needle = destination.trim().toLowerCase();
     if (!needle) return [];
@@ -121,18 +201,33 @@ export default function GuestHome() {
     });
   };
   const closeDropdowns = () => {
-    setPeopleOpen(false);
     setShowSuggestions(false);
   };
 
   return (
     <SafeAreaView style={styles.screen}>
+      <View
+        style={[
+          styles.fixedNotch,
+          { top: insets.top },
+        ]}
+      >
+        {canRenderSvg ? (
+          <Logo width={148} height={148} />
+        ) : (
+          <Image
+            source={require("../../../assets/images/android-icon-foreground.png")}
+            style={styles.brandFallbackLogo}
+          />
+        )}
+      </View>
       <ScrollView
         contentContainerStyle={[
           styles.container,
-          { paddingTop: insets.top + 16 },
+          { paddingTop: insets.top + 42 },
         ]}
       >
+        <Text style={styles.sectionTitle}>Look for micro-services!</Text>
         {/* Search (always open) */}
         <View style={styles.searchContainer}>
           <View style={styles.searchExpanded}>
@@ -219,36 +314,12 @@ export default function GuestHome() {
                 </View>
               </View>
               <View style={styles.fieldGap}>
-                <TouchableOpacity
-                  style={styles.selectField}
-                  onPress={() => {
-                    closeDropdowns();
-                    setPeopleOpen((v) => !v);
-                  }}
-                >
-                  <Text style={styles.selectLabel}>{people || t("home.people")}</Text>
-                  <MaterialCommunityIcons
-                    name="account-group-outline"
-                    size={18}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
-                {peopleOpen && (
-                  <View style={styles.dropdown}>
-                    {["1", "2", "3", "4+"].map((p) => (
-                      <TouchableOpacity
-                        key={p}
-                        style={styles.dropdownItem}
-                        onPress={() => {
-                          setPeople(p);
-                          setPeopleOpen(false);
-                        }}
-                      >
-                        <Text>{p}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                <UIWheelSelectField
+                  placeholder={t("home.people")}
+                  value={people}
+                  options={["1", "2", "3", "4+"]}
+                  onChange={setPeople}
+                />
               </View>
 
               <TouchableOpacity
@@ -277,10 +348,19 @@ export default function GuestHome() {
 
         {/* Recently viewed */}
         <Text style={styles.sectionTitle}>{t("home.recentlyViewed")}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {(loadingServices ? [] : recentlyViewed).map((item) => (
+        <FlatList
+          data={loadingServices ? [] : recentlyViewed}
+          keyExtractor={(item) => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          removeClippedSubviews
+          style={styles.horizontalList}
+          contentContainerStyle={styles.horizontalListContent}
+          initialNumToRender={6}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          renderItem={({ item }) => (
             <ServiceCard
-              key={item.id}
               onPress={() => goToServiceDetails(item)}
               title={item.title}
               price={toPriceLabel(item.price_eur)}
@@ -294,24 +374,41 @@ export default function GuestHome() {
                 if (!user) return;
                 const next = new Set(favoriteIds);
                 if (next.has(item.id)) {
-                  await removeFavorite(user.id, item.id);
+                  const { error } = await removeFavorite(user.id, item.id);
+                  if (error) {
+                    console.warn("remove favorite failed", error.message);
+                    return;
+                  }
                   next.delete(item.id);
                 } else {
-                  await addFavorite(user.id, item.id);
+                  const { error } = await addFavorite(user.id, item.id);
+                  if (error) {
+                    console.warn("add favorite failed", error.message);
+                    return;
+                  }
                   next.add(item.id);
                 }
                 setFavoriteIds(next);
               }}
             />
-          ))}
-        </ScrollView>
+          )}
+        />
 
         {/* Around you */}
         <Text style={styles.sectionTitle}>{t("home.aroundYou")}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {(loadingServices ? [] : aroundYou).map((item) => (
+        <FlatList
+          data={loadingServices ? [] : aroundYou}
+          keyExtractor={(item) => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          removeClippedSubviews
+          style={styles.horizontalList}
+          contentContainerStyle={styles.horizontalListContent}
+          initialNumToRender={6}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          renderItem={({ item }) => (
             <ServiceCard
-              key={item.id}
               onPress={() => goToServiceDetails(item)}
               title={item.title}
               price={toPriceLabel(item.price_eur)}
@@ -325,25 +422,63 @@ export default function GuestHome() {
                 if (!user) return;
                 const next = new Set(favoriteIds);
                 if (next.has(item.id)) {
-                  await removeFavorite(user.id, item.id);
+                  const { error } = await removeFavorite(user.id, item.id);
+                  if (error) {
+                    console.warn("remove favorite failed", error.message);
+                    return;
+                  }
                   next.delete(item.id);
                 } else {
-                  await addFavorite(user.id, item.id);
+                  const { error } = await addFavorite(user.id, item.id);
+                  if (error) {
+                    console.warn("add favorite failed", error.message);
+                    return;
+                  }
                   next.add(item.id);
                 }
                 setFavoriteIds(next);
               }}
             />
-          ))}
-        </ScrollView>
+          )}
+        />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   container: { padding: 16, paddingBottom: 24 },
+  fixedNotch: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 48,
+    backgroundColor: "#2E6A52",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    paddingLeft: 20,
+    zIndex: 50,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  brandBar: {
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: "#0B3D2E",
+    marginBottom: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "visible",
+  },
+  brandFallbackLogo: {
+    width: 148,
+    height: 148,
+    marginLeft: 12,
+  },
   categories: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -356,6 +491,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   categoryBadge: {
     flexDirection: "row",
@@ -367,12 +507,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignSelf: "flex-start",
     marginBottom: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   categoryBadgeText: {
     fontWeight: "600",
     color: colors.textPrimary,
   },
-  sectionTitle: { fontWeight: "600", marginVertical: 10 },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginTop: 10,
+    marginBottom: 12,
+    color: colors.textPrimary,
+  },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -449,4 +600,32 @@ const styles = StyleSheet.create({
     color: colors.background,
     fontWeight: "600",
   },
+  horizontalList: {
+    overflow: "visible",
+  },
+  horizontalListContent: {
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+  },
 });
+
+function haversineMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+

@@ -4,7 +4,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,11 +14,13 @@ import { useAuthState } from "../../../lib/auth";
 import { supabase } from "../../../lib/supabase";
 import QRCode from "react-native-qrcode-svg";
 import { colors } from "../../../lib/theme";
+import { useAppDialog } from "../../../components/AppDialogProvider";
 
 export default function ManageBooking() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const dialog = useAppDialog();
   const { destination, timeslot, people, microservice, from, bookingId, qrToken } =
     useLocalSearchParams<{
       destination?: string;
@@ -33,6 +34,24 @@ export default function ManageBooking() {
   const [token, setToken] = useState<string | null>(qrToken ?? null);
   const [canceling, setCanceling] = useState(false);
   const { user } = useAuthState();
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  async function waitForSession(timeoutMs = 3000) {
+    if (!supabase) return null;
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const session = (data as any)?.session ?? null;
+        if (session?.user) return session.user;
+      } catch {
+        // ignore and retry
+      }
+      await sleep(250);
+    }
+    return null;
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -73,7 +92,6 @@ export default function ManageBooking() {
         </TouchableOpacity>
         <Text style={styles.thankYou}>{t("booking.manageTitle")}</Text>
 
-        {/* Service recap card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{microservice}</Text>
           <View style={styles.summaryLine}>
@@ -90,7 +108,6 @@ export default function ManageBooking() {
           </View>
         </View>
 
-        {/* QR code card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t("booking.accessQr")}</Text>
           <View style={styles.qrMock}>
@@ -98,75 +115,105 @@ export default function ManageBooking() {
           </View>
         </View>
 
-        {/* Actions */}
         <View style={styles.actions}>
           <TouchableOpacity
             style={[styles.actionButton, styles.danger]}
-            onPress={() => {
+            onPress={async () => {
               if (!bookingId || !supabase) {
-                Alert.alert(
-                  t("booking.cancel"),
-                  "Unable to cancel this booking."
-                );
+                await dialog.alert(t("booking.cancel"), "Unable to cancel this booking.");
                 return;
               }
-              Alert.alert(t("booking.cancel"), t("booking.cancelConfirm"), [
-                { text: t("booking.cancelNo"), style: "cancel" },
-                {
-                  text: t("booking.cancelYes"),
-                  style: "destructive",
-                  onPress: async () => {
-                    setCanceling(true);
-                    try {
-                      if (!user) {
-                        setCanceling(false);
-                        Alert.alert(t("booking.cancel"), t("bookings.signIn") || "Please sign in to cancel bookings.");
-                        return;
-                      }
 
-                      // fetch booking owner to verify permissions (safe check)
-                      const idToUse = bookingId && /^[0-9]+$/.test(String(bookingId)) ? Number(bookingId) : bookingId;
-                      console.log("ManageBooking: attempting delete", { bookingId: idToUse, userId: user.id });
-                      const { data: fetchData, error: fetchErr } = await supabase
-                        .from("bookings")
-                        .select("guest_id")
-                        .eq("id", idToUse as any)
-                        .maybeSingle();
-                      if (fetchErr) {
-                        setCanceling(false);
-                        console.warn("ManageBooking: fetch owner error", fetchErr);
-                        Alert.alert(t("booking.cancel"), fetchErr.message);
-                        return;
-                      }
-                      if (!fetchData || fetchData.guest_id !== user.id) {
-                        setCanceling(false);
-                        console.warn("ManageBooking: permission denied or booking not found", fetchData);
-                        Alert.alert(t("booking.cancel"), t("booking.cancelNotAllowed") || "You are not allowed to cancel this booking.");
-                        return;
-                      }
+              const confirmed = await dialog.confirm({
+                title: t("booking.cancel"),
+                message: t("booking.cancelConfirm"),
+                cancelText: t("booking.cancelNo"),
+                confirmText: t("booking.cancelYes"),
+                confirmVariant: "danger",
+              });
+              if (!confirmed) return;
 
-                      const { data, error } = await supabase
-                        .from("bookings")
-                        .delete()
-                        .eq("id", idToUse as any);
-                      setCanceling(false);
-                      console.log("ManageBooking: delete result", { data, error });
-                      if (error) {
-                        Alert.alert(t("booking.cancel"), error.message);
-                        return;
-                      }
-                      if (!data || (Array.isArray(data) && data.length === 0)) {
-                        Alert.alert(t("booking.cancel"), t("booking.cancelFailed") || "No booking was deleted.");
-                        return;
-                      }
-                      router.replace("/(tabs)/bookings");
-                    } catch (e: any) {
-                      setCanceling(false);
-                      Alert.alert(t("booking.cancel"), e?.message || String(e));
-                    }
-                  },
-                },
-              ]);
+              setCanceling(true);
+              try {
+                const sessionUser = user ?? (await waitForSession(3000));
+                const activeUserId = sessionUser?.id ?? null;
+                if (!activeUserId) {
+                  setCanceling(false);
+                  await dialog.alert(
+                    t("booking.cancel"),
+                    t("bookings.signIn") || "Please sign in to cancel bookings."
+                  );
+                  return;
+                }
+
+                const idToUse = bookingId && /^[0-9]+$/.test(String(bookingId)) ? Number(bookingId) : bookingId;
+                console.log("ManageBooking: attempting delete", { bookingId: idToUse, userId: activeUserId });
+
+                const { data: fetchData, error: fetchErr } = await supabase
+                  .from("bookings")
+                  .select("guest_id")
+                  .eq("id", idToUse as any)
+                  .maybeSingle();
+                if (fetchErr) {
+                  setCanceling(false);
+                  console.warn("ManageBooking: fetch owner error", fetchErr);
+                  await dialog.alert(t("booking.cancel"), fetchErr.message);
+                  return;
+                }
+                if (!fetchData || fetchData.guest_id !== activeUserId) {
+                  setCanceling(false);
+                  console.warn("ManageBooking: permission denied or booking not found", fetchData);
+                  await dialog.alert(
+                    t("booking.cancel"),
+                    t("booking.cancelNotAllowed") || "You are not allowed to cancel this booking."
+                  );
+                  return;
+                }
+
+                const { data, error, status } = await supabase
+                  .from("bookings")
+                  .delete()
+                  .eq("id", idToUse as any)
+                  .eq("guest_id", activeUserId)
+                  .select("*");
+                console.log("ManageBooking: delete result", { data, error, status });
+                if (error) {
+                  setCanceling(false);
+                  await dialog.alert(t("booking.cancel"), error.message);
+                  return;
+                }
+
+                if (Array.isArray(data) && data.length > 0) {
+                  setCanceling(false);
+                  router.replace("/(tabs)/bookings");
+                  return;
+                }
+
+                const { data: verify, error: verifyErr } = await supabase
+                  .from("bookings")
+                  .select("id")
+                  .eq("id", idToUse as any)
+                  .maybeSingle();
+                setCanceling(false);
+                if (verifyErr) {
+                  console.warn("ManageBooking: verify existence error", verifyErr);
+                  await dialog.alert(t("booking.cancel"), verifyErr.message);
+                  return;
+                }
+                if (verify && verify.id) {
+                  await dialog.alert(
+                    t("booking.cancel"),
+                    t("booking.cancelFailed") ||
+                      `Unable to delete booking ${String(idToUse)}. This is likely due to Row Level Security blocking the operation or the request missing an auth token.`
+                  );
+                  return;
+                }
+
+                router.replace("/(tabs)/bookings");
+              } catch (e: any) {
+                setCanceling(false);
+                await dialog.alert(t("booking.cancel"), e?.message || String(e));
+              }
             }}
             disabled={canceling}
           >
@@ -182,7 +229,7 @@ export default function ManageBooking() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   container: { padding: 16, paddingBottom: 24 },
   thankYou: {
     fontSize: 20,
@@ -206,6 +253,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   cardTitle: {
     fontWeight: "700",
@@ -237,7 +289,7 @@ const styles = StyleSheet.create({
   },
   qrMock: {
     height: 180,
-    backgroundColor: colors.border,
+    backgroundColor: colors.background,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",

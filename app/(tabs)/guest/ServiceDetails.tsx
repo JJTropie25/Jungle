@@ -4,7 +4,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -16,12 +15,15 @@ import { supabase } from "../../../lib/supabase";
 import { useAuthState } from "../../../lib/auth";
 import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favorites";
 import { colors } from "../../../lib/theme";
+import { addRecentlyViewedId } from "../../../lib/recentlyViewed";
+import { useAppDialog } from "../../../components/AppDialogProvider";
 
 export default function ServiceDetails() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { user } = useAuthState();
+  const dialog = useAppDialog();
   const { destination, timeslot, people, microservice, serviceId } =
     useLocalSearchParams<{
       destination?: string;
@@ -36,6 +38,29 @@ export default function ServiceDetails() {
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const reviews = useMemo(
+    () => [
+      {
+        id: "r1",
+        author: "Giulia M.",
+        rating: "4.8",
+        text: "Very clean spot and quick access. Perfect for a short stop.",
+      },
+      {
+        id: "r2",
+        author: "Luca R.",
+        rating: "4.6",
+        text: "Easy check-in and friendly host. Would book again.",
+      },
+      {
+        id: "r3",
+        author: "Sara T.",
+        rating: "4.9",
+        text: "Exactly as described, great location and smooth booking.",
+      },
+    ],
+    []
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -108,16 +133,29 @@ export default function ServiceDetails() {
     };
   }, [serviceId, user]);
 
+  useEffect(() => {
+    if (!serviceId) return;
+    addRecentlyViewedId(serviceId, user?.id);
+  }, [serviceId, user?.id]);
+
   const toggleFavorite = async () => {
     if (!user || !serviceId) {
-      Alert.alert(t("favorites.title"), t("favorites.signIn"));
+      await dialog.alert(t("favorites.title"), t("favorites.signIn"));
       return;
     }
     if (isFavorite) {
-      await removeFavorite(user.id, serviceId);
+      const { error } = await removeFavorite(user.id, serviceId);
+      if (error) {
+        await dialog.alert(t("favorites.title"), error.message);
+        return;
+      }
       setIsFavorite(false);
     } else {
-      await addFavorite(user.id, serviceId);
+      const { error } = await addFavorite(user.id, serviceId);
+      if (error) {
+        await dialog.alert(t("favorites.title"), error.message);
+        return;
+      }
       setIsFavorite(true);
     }
   };
@@ -130,45 +168,24 @@ export default function ServiceDetails() {
   }, [slots]);
 
   const handleBooking = async () => {
-    if (!supabase) {
-      Alert.alert(t("service.bookNow"), "Supabase is not configured.");
-      return;
-    }
     if (!user) {
       router.push("/(auth)/sign-in");
       return;
     }
     if (!serviceId || !selectedHour) return;
+
     const match = slots.find((s) => s.time === selectedHour);
     const slotStart = match?.start ?? new Date().toISOString();
     const slotEnd =
       match?.end ??
       new Date(new Date(slotStart).getTime() + 30 * 60 * 1000).toISOString();
-    const peopleCount = Number(people ?? 1) || 1;
-    const qrToken = `BK-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-    const { data, error } = await supabase
-      .from("bookings")
-      .insert({
-        guest_id: user.id,
-        service_id: serviceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-        people_count: peopleCount,
-        qr_token: qrToken,
-      })
-      .select("id")
-      .single();
-    if (error) {
-      Alert.alert(t("service.bookNow"), error.message);
-      return;
-    }
+
     router.push({
-      pathname: "/(tabs)/guest/BookingConfirmation",
+      pathname: "/(tabs)/guest/Payment",
       params: {
-        bookingId: data.id,
-        qrToken,
+        serviceId,
+        slotStart,
+        slotEnd,
         destination,
         timeslot,
         people,
@@ -186,7 +203,6 @@ export default function ServiceDetails() {
           { paddingTop: insets.top + 16 },
         ]}
       >
-        {/* SUMMARY */}
         <View style={styles.summaryBox}>
           <TouchableOpacity
             style={styles.summaryBack}
@@ -223,7 +239,6 @@ export default function ServiceDetails() {
           </TouchableOpacity>
         </View>
 
-        {/* IMAGE MOCK */}
         <View style={styles.imageMock}>
           {imageUrl ? (
             <Image source={{ uri: imageUrl }} style={styles.imageFill} />
@@ -232,9 +247,20 @@ export default function ServiceDetails() {
           )}
         </View>
 
-        {/* HOURS */}
+        <Text style={styles.sectionTitle}>Description</Text>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoText}>
+            {microservice ?? "This service"} near {destination ?? "your destination"} is designed
+            for fast, reliable access with clear check-in flow, secure space, and flexible timing.
+          </Text>
+        </View>
+
         <Text style={styles.sectionTitle}>{t("service.availableTimes")}</Text>
-        <View style={styles.grid}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.timeRow}
+        >
           {availableHours.map((h) => (
             <TouchableOpacity
               key={h}
@@ -251,9 +277,21 @@ export default function ServiceDetails() {
               </Text>
             </TouchableOpacity>
           ))}
+        </ScrollView>
+
+        <Text style={styles.sectionTitle}>Reviews</Text>
+        <View style={styles.reviewsList}>
+          {reviews.map((review) => (
+            <View key={review.id} style={styles.reviewCard}>
+              <View style={styles.reviewHeader}>
+                <Text style={styles.reviewAuthor}>{review.author}</Text>
+                <Text style={styles.reviewRating}>★ {review.rating}</Text>
+              </View>
+              <Text style={styles.reviewText}>{review.text}</Text>
+            </View>
+          ))}
         </View>
 
-        {/* BOOK */}
         <TouchableOpacity
           style={[
             styles.bookButton,
@@ -270,7 +308,7 @@ export default function ServiceDetails() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   container: { padding: 16, paddingBottom: 24 },
   summaryBox: {
     backgroundColor: colors.surface,
@@ -280,6 +318,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   summaryBack: {
     width: 32,
@@ -339,17 +382,32 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
   },
   sectionTitle: {
-    fontWeight: "600",
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginBottom: 10,
+    marginTop: 6,
   },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  infoCard: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12,
+    marginBottom: 12,
+  },
+  infoText: {
+    color: colors.textSecondary,
+    lineHeight: 20,
+    fontWeight: "500",
+  },
+  timeRow: {
     gap: 8,
-    marginBottom: 20,
+    paddingRight: 8,
+    marginBottom: 14,
   },
   hourButton: {
-    width: "30%",
+    minWidth: 92,
     padding: 12,
     backgroundColor: colors.surfaceSoft,
     borderRadius: 8,
@@ -361,6 +419,35 @@ const styles = StyleSheet.create({
   hourTextSelected: {
     fontWeight: "700",
     color: colors.background,
+  },
+  reviewsList: {
+    gap: 10,
+    marginBottom: 18,
+  },
+  reviewCard: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 12,
+  },
+  reviewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    alignItems: "center",
+  },
+  reviewAuthor: {
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  reviewRating: {
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  reviewText: {
+    color: colors.textSecondary,
+    lineHeight: 19,
   },
   bookButton: {
     padding: 16,

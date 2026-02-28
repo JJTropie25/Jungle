@@ -44,7 +44,7 @@ export default function BookingConfirmation() {
       .then(({ data }) => {
         if (!isMounted) return;
         if (data?.qr_token) setToken(data.qr_token);
-        if (data?.service?.image_url) setImageUrl(data.service.image_url);
+        if (data?.service?.image_url) setImageUrl(data?.service?.image_url ?? null);
       });
     return () => {
       isMounted = false;
@@ -140,7 +140,7 @@ export default function BookingConfirmation() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   container: { padding: 16, paddingBottom: 24 },
   thankYou: {
     fontSize: 20,
@@ -155,6 +155,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
   cardImage: {
     width: "100%",
@@ -207,10 +212,11 @@ const styles = StyleSheet.create({
   },
   qrMock: {
     height: 180,
-    backgroundColor: colors.border,
+    backgroundColor: colors.background,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 8,
   },
 });
+

@@ -7,7 +7,13 @@ export default function TabsLayout() {
   const { t } = useI18n();
   const router = useRouter();
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        sceneStyle: { backgroundColor: "transparent" },
+        tabBarStyle: { backgroundColor: "rgba(255,255,255,0.9)" },
+      }}
+    >
       <Tabs.Screen
         name="guest"
         options={{

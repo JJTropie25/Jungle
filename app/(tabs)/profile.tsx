@@ -1,19 +1,21 @@
-import { View, Text, StyleSheet, Image, Pressable, Alert } from "react-native";
+import { View, Text, StyleSheet, Image, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { useI18n } from "../../lib/i18n";
 import { supabase } from "../../lib/supabase";
 import { useAuthState } from "../../lib/auth";
 import { useEffect, useState } from "react";
 import { colors } from "../../lib/theme";
+import { useAppDialog } from "../../components/AppDialogProvider";
 
 export default function Profile() {
   const router = useRouter();
   const { t } = useI18n();
+  const dialog = useAppDialog();
   const { user } = useAuthState();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const handleLogout = async () => {
     if (!supabase) {
-      Alert.alert(
+      await dialog.alert(
         t("profile.logout"),
         "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
       );
@@ -21,10 +23,10 @@ export default function Profile() {
     }
     const { error } = await supabase.auth.signOut();
     if (error) {
-      Alert.alert(t("profile.logout"), error.message);
+      await dialog.alert(t("profile.logout"), error.message);
       return;
     }
-    Alert.alert(t("profile.logout"), t("profile.logoutSuccess"));
+    await dialog.alert(t("profile.logout"), t("profile.logoutSuccess"));
   };
 
   useEffect(() => {
@@ -102,7 +104,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     paddingTop: 48,
     paddingHorizontal: 24,
-    backgroundColor: colors.background,
+    backgroundColor: colors.screenBackground,
   },
   header: {
     alignItems: "center",

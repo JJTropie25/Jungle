@@ -97,7 +97,7 @@ export default function Language() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
   container: {
     paddingHorizontal: 24,
   },
