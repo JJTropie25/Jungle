@@ -17,6 +17,7 @@ type ServiceCardProps = {
   location: string;
   imageSource: ImageSourcePropType;
   meta?: string;
+  rating?: number | null;
   fullWidth?: boolean;
   horizontal?: boolean;
   onPress?: () => void;
@@ -32,6 +33,7 @@ export default function ServiceCard({
   location,
   imageSource,
   meta,
+  rating,
   fullWidth,
   horizontal,
   onPress,
@@ -45,6 +47,10 @@ export default function ServiceCard({
     styles.imageWrap,
     horizontal && styles.imageWrapHorizontal,
   ];
+  const ratingLabel =
+    typeof rating === "number" && Number.isFinite(rating)
+      ? `${rating.toFixed(1)}/10`
+      : null;
 
   return (
     <Container
@@ -75,11 +81,18 @@ export default function ServiceCard({
           </Pressable>
         )}
       </View>
-      <View style={horizontal && styles.content}>
+      <View style={styles.content}>
         <Text style={styles.title}>{title}</Text>
+        {ratingLabel ? (
+          <View style={styles.ratingBadge}>
+            <Text style={styles.ratingText}>{ratingLabel}</Text>
+          </View>
+        ) : null}
         {meta ? <Text style={styles.meta}>{meta}</Text> : null}
-        <Text style={styles.price}>{price}</Text>
         <Text style={styles.location}>{location}</Text>
+      </View>
+      <View style={styles.priceCorner}>
+        <Text style={styles.price}>{price}</Text>
       </View>
     </Container>
   );
@@ -87,6 +100,7 @@ export default function ServiceCard({
 
 const styles = StyleSheet.create({
   card: {
+    position: "relative",
     width: 170,
     backgroundColor: colors.background,
     borderRadius: 10,
@@ -143,27 +157,53 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    paddingBottom: 26,
   },
   title: {
     fontSize: 14,
-    fontWeight: "600",
-    color: colors.textPrimary,
+    fontWeight: "700",
+    color: "#000000",
+  },
+  ratingBadge: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+    backgroundColor: colors.textPrimary,
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  ratingText: {
+    color: colors.background,
+    fontSize: 11,
+    fontWeight: "700",
   },
   meta: {
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 4,
   },
+  priceCorner: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#CFEFD9",
+    borderTopLeftRadius: 14,
+    borderBottomRightRadius: 9,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderLeftWidth: 1,
+    borderTopWidth: 1,
+    borderColor: "rgba(111,182,154,0.8)",
+  },
   price: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.textPrimary,
-    marginTop: 4,
+    fontSize: 15,
+    fontWeight: "800",
+    color: colors.accent,
   },
   location: {
     fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 2,
+    marginTop: 4,
   },
 });
 

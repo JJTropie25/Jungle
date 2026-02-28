@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,6 +15,8 @@ import { supabase } from "../../../lib/supabase";
 import { useAuthState } from "../../../lib/auth";
 import { useEffect, useState } from "react";
 import * as ImagePicker from "expo-image-picker";
+import * as LegacyFileSystem from "expo-file-system/legacy";
+import { Buffer } from "buffer";
 import { colors } from "../../../lib/theme";
 import { useAppDialog } from "../../../components/AppDialogProvider";
 
@@ -71,21 +74,47 @@ export default function EditProfile() {
       await dialog.alert(t("edit.changePhoto"), "Permission denied.");
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      allowsEditing: true,
-      aspect: [1, 1],
-    });
+    let result: ImagePicker.ImagePickerResult;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 0.8,
+        allowsEditing: true,
+        aspect: [1, 1],
+        ...(Platform.OS === "android" ? { legacy: true } : {}),
+      });
+    } catch (error: any) {
+      await dialog.alert(
+        t("edit.changePhoto"),
+        error?.message ?? t("edit.photoError")
+      );
+      return;
+    }
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
-    const fileExt = asset.uri.split(".").pop() || "jpg";
+    const inferredExt =
+      asset.mimeType?.split("/").pop() ||
+      asset.fileName?.split(".").pop() ||
+      asset.uri.split(".").pop() ||
+      "jpg";
+    const fileExt = inferredExt.toLowerCase();
     const filePath = `avatars/${user.id}.${fileExt}`;
-    const response = await fetch(asset.uri);
-    const blob = await response.blob();
+    let fileBuffer: Uint8Array;
+    try {
+      const base64 = await LegacyFileSystem.readAsStringAsync(asset.uri, {
+        encoding: "base64",
+      });
+      fileBuffer = Buffer.from(base64, "base64");
+    } catch (error: any) {
+      await dialog.alert(
+        t("edit.changePhoto"),
+        error?.message ?? t("edit.photoError")
+      );
+      return;
+    }
     const { error } = await supabase.storage
       .from("avatars")
-      .upload(filePath, blob, {
+      .upload(filePath, fileBuffer, {
         cacheControl: "3600",
         upsert: true,
         contentType: asset.mimeType ?? "image/jpeg",

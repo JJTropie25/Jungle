@@ -4,6 +4,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
+  ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,7 +12,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import ServiceCard from "../../../components/ServiceCard";
 import ResultsActionBar from "../../../components/ResultsActionBar";
 import ResultsMap from "../../../components/ResultsMap";
-import Slider from "../../../components/UISlider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../../../lib/i18n";
 import { colors } from "../../../lib/theme";
@@ -28,7 +28,7 @@ import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favo
 export default function SearchResults() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { user } = useAuthState();
   const placeholderImage = require("../../../assets/images/react-logo.png");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
@@ -38,13 +38,9 @@ export default function SearchResults() {
   const [sortBy, setSortBy] = useState<
     "priceUp" | "priceDown" | "topRated" | "nearest"
   >("topRated");
-  const [filterBy, setFilterBy] = useState<"All" | "Price" | "Distance" | "Rating">(
-    "All",
-  );
   const [priceMax, setPriceMax] = useState(500);
-  const [distanceMax, setDistanceMax] = useState(20);
-  const [ratingMin, setRatingMin] = useState(5);
-  const [isSliding, setIsSliding] = useState(false);
+  const [distanceMax, setDistanceMax] = useState(50);
+  const [ratingMin, setRatingMin] = useState(0);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const mapScrollRef = useRef<FlatList<Service>>(null);
   const CARD_WIDTH = 260;
@@ -125,17 +121,9 @@ export default function SearchResults() {
       const needle = destination.toLowerCase();
       items = items.filter((s) => s.location.toLowerCase().includes(needle));
     }
-    if (filterBy === "Price") {
-      items = items.filter((s) => s.price_eur <= priceMax);
-    }
-    if (filterBy === "Distance") {
-      items = items.filter(
-        (s) => (s.distance_meters ?? 0) <= distanceMax * 1000
-      );
-    }
-    if (filterBy === "Rating") {
-      items = items.filter((s) => (s.rating ?? 0) >= ratingMin);
-    }
+    items = items.filter((s) => s.price_eur <= priceMax);
+    items = items.filter((s) => (s.distance_meters ?? 0) <= distanceMax * 1000);
+    items = items.filter((s) => (s.rating ?? 0) >= ratingMin);
     if (sortBy === "priceUp") {
       items = [...items].sort((a, b) => a.price_eur - b.price_eur);
     } else if (sortBy === "priceDown") {
@@ -152,7 +140,6 @@ export default function SearchResults() {
     services,
     normalizedCategory,
     destination,
-    filterBy,
     priceMax,
     distanceMax,
     ratingMin,
@@ -176,13 +163,53 @@ export default function SearchResults() {
     }
   }, [resultsByIndex, selectedTitle, viewMode]);
 
+  const { summaryDate, summaryTime } = useMemo(() => {
+    const raw = String(timeslot ?? "").trim();
+    if (!raw) return { summaryDate: "-", summaryTime: "-" };
+
+    const isoLike = raw.match(
+      /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2}))?$/
+    );
+    if (isoLike) {
+      const [, y, m, d, hhmm] = isoLike;
+      const date = new Date(Number(y), Number(m) - 1, Number(d));
+      const locale =
+        language === "it"
+          ? "it-IT"
+          : language === "es"
+          ? "es-ES"
+          : language === "zh"
+          ? "zh-CN"
+          : "en-US";
+      let month = new Intl.DateTimeFormat(locale, { month: "short" }).format(date);
+      month = month.charAt(0).toUpperCase() + month.slice(1);
+      if (!month.endsWith(".")) month += ".";
+      return {
+        summaryDate: `${Number(d)} ${month}`,
+        summaryTime: hhmm ?? "-",
+      };
+    }
+
+    if (/^\d{2}:\d{2}$/.test(raw)) {
+      return { summaryDate: "-", summaryTime: raw };
+    }
+
+    const [maybeDate, maybeTime] = raw.split(" ");
+    return {
+      summaryDate: maybeDate || "-",
+      summaryTime: maybeTime || "-",
+    };
+  }, [language, timeslot]);
+
   const SummaryLine = () => (
     <View style={styles.summaryLine}>
       <Text style={styles.summaryItem}>{microservice ?? "-"}</Text>
       <Text style={styles.summarySep}>|</Text>
       <Text style={styles.summaryItem}>{destination ?? "-"}</Text>
       <Text style={styles.summarySep}>|</Text>
-      <Text style={styles.summaryItem}>{timeslot ?? "-"}</Text>
+      <Text style={styles.summaryItem}>{summaryDate}</Text>
+      <Text style={styles.summarySep}>|</Text>
+      <Text style={styles.summaryItem}>{summaryTime}</Text>
       <Text style={styles.summarySep}>|</Text>
       <View style={styles.summaryPeople}>
         <MaterialCommunityIcons name="account-group" size={16} color={colors.textPrimary} />
@@ -190,6 +217,25 @@ export default function SearchResults() {
       </View>
     </View>
   );
+  const closeMenus = () => {
+    setSortOpen(false);
+    setFilterOpen(false);
+  };
+
+  const priceOptions = useMemo(
+    () => Array.from({ length: 101 }, (_, i) => i * 5),
+    []
+  );
+  const distanceOptions = useMemo(
+    () => Array.from({ length: 11 }, (_, i) => i * 5),
+    []
+  );
+  const ratingOptions = useMemo(
+    () => Array.from({ length: 21 }, (_, i) => i * 0.5),
+    []
+  );
+  const isFilterActive =
+    priceMax !== 500 || distanceMax !== 50 || ratingMin !== 0;
 
   const SortFilterMenus = () => (
     <View style={styles.menuWrap}>
@@ -216,82 +262,114 @@ export default function SearchResults() {
       )}
       {filterOpen && (
         <View style={styles.menuBox}>
-          {[
-            { value: "All", label: t("search.filter.all") },
-            { value: "Price", label: t("search.filter.price") },
-            { value: "Distance", label: t("search.filter.distance") },
-            { value: "Rating", label: t("search.filter.rating") },
-          ].map((opt) => (
+          <View style={styles.sliderBox}>
+            <Text style={styles.sliderLabel}>
+              {t("search.maxPrice", { value: priceMax })}
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.optionRow}
+            >
+              {priceOptions.map((value) => (
+                <TouchableOpacity
+                  key={`price-${value}`}
+                  style={[
+                    styles.optionChip,
+                    priceMax === value && styles.optionChipSelected,
+                  ]}
+                  onPress={() => setPriceMax(value)}
+                >
+                  <Text
+                    style={[
+                      styles.optionChipText,
+                      priceMax === value && styles.optionChipTextSelected,
+                    ]}
+                  >
+                    {value}€
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          <View style={styles.sliderBox}>
+            <Text style={styles.sliderLabel}>
+              {t("search.maxDistance", { value: distanceMax })}
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.optionRow}
+            >
+              {distanceOptions.map((value) => (
+                <TouchableOpacity
+                  key={`distance-${value}`}
+                  style={[
+                    styles.optionChip,
+                    distanceMax === value && styles.optionChipSelected,
+                  ]}
+                  onPress={() => setDistanceMax(value)}
+                >
+                  <Text
+                    style={[
+                      styles.optionChipText,
+                      distanceMax === value && styles.optionChipTextSelected,
+                    ]}
+                  >
+                    {value}km
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          <View style={styles.sliderBox}>
+            <Text style={styles.sliderLabel}>
+              {t("search.minRating", { value: ratingMin })}
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.optionRow}
+            >
+              {ratingOptions.map((value) => (
+                <TouchableOpacity
+                  key={`rating-${value}`}
+                  style={[
+                    styles.optionChip,
+                    ratingMin === value && styles.optionChipSelected,
+                  ]}
+                  onPress={() => setRatingMin(value)}
+                >
+                  <Text
+                    style={[
+                      styles.optionChipText,
+                      ratingMin === value && styles.optionChipTextSelected,
+                    ]}
+                  >
+                    {value.toFixed(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          <View style={styles.applyWrap}>
             <TouchableOpacity
-              key={opt.value}
-              style={styles.menuItem}
+              style={[styles.applyButton, styles.clearButton]}
               onPress={() => {
-                setFilterBy(opt.value as any);
+                setPriceMax(500);
+                setDistanceMax(50);
+                setRatingMin(0);
               }}
             >
-              <Text style={styles.menuText}>{opt.label}</Text>
+              <Text style={[styles.applyButtonText, styles.clearButtonText]}>Clear</Text>
             </TouchableOpacity>
-          ))}
-          {filterBy === "Price" && (
-            <View style={styles.sliderBox}>
-              <Text style={styles.sliderLabel}>
-                {t("search.maxPrice", { value: priceMax })}
-              </Text>
-              <Slider
-                minimumValue={0}
-                maximumValue={1000}
-                step={10}
-                value={priceMax}
-                onValueChange={(v: number) => {
-                  setIsSliding(true);
-                  setPriceMax(v);
-                }}
-                onSlidingStart={() => setIsSliding(true)}
-                onSlidingComplete={() => setIsSliding(false)}
-                minimumTrackTintColor={colors.textPrimary}
-              />
-            </View>
-          )}
-          {filterBy === "Distance" && (
-            <View style={styles.sliderBox}>
-              <Text style={styles.sliderLabel}>
-                {t("search.maxDistance", { value: distanceMax })}
-              </Text>
-              <Slider
-                minimumValue={0}
-                maximumValue={100}
-                step={1}
-                value={distanceMax}
-                onValueChange={(v: number) => {
-                  setIsSliding(true);
-                  setDistanceMax(v);
-                }}
-                onSlidingStart={() => setIsSliding(true)}
-                onSlidingComplete={() => setIsSliding(false)}
-                minimumTrackTintColor={colors.textPrimary}
-              />
-            </View>
-          )}
-          {filterBy === "Rating" && (
-            <View style={styles.sliderBox}>
-              <Text style={styles.sliderLabel}>
-                {t("search.minRating", { value: ratingMin })}
-              </Text>
-              <Slider
-                minimumValue={0}
-                maximumValue={10}
-                step={0.5}
-                value={ratingMin}
-                onValueChange={(v: number) => {
-                  setIsSliding(true);
-                  setRatingMin(v);
-                }}
-                onSlidingStart={() => setIsSliding(true)}
-                onSlidingComplete={() => setIsSliding(false)}
-                minimumTrackTintColor={colors.textPrimary}
-              />
-            </View>
-          )}
+            <TouchableOpacity
+              style={styles.applyButton}
+              onPress={() => setFilterOpen(false)}
+            >
+              <Text style={styles.applyButtonText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -329,9 +407,15 @@ export default function SearchResults() {
                   setFilterOpen((v) => !v);
                   setSortOpen(false);
                 },
-                badge: filterBy !== "All",
+                badge: isFilterActive,
               },
-              { label: t("search.map"), onPress: () => setViewMode("map") },
+              {
+                label: t("search.map"),
+                onPress: () => {
+                  closeMenus();
+                  setViewMode("map");
+                },
+              },
             ]}
           />
             <SortFilterMenus />
@@ -341,7 +425,7 @@ export default function SearchResults() {
             data={filteredResults}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.container}
-            scrollEnabled={!isSliding && !sortOpen && !filterOpen}
+            scrollEnabled={!sortOpen && !filterOpen}
             initialNumToRender={8}
             maxToRenderPerBatch={10}
             windowSize={7}
@@ -362,7 +446,8 @@ export default function SearchResults() {
                 location={item.location}
                 meta={`${t(toTypeKey(item.category))} - ${toDistanceLabel(
                   item.distance_meters
-                )} - ${t("label.rating")} ${item.rating ?? "-"}`}
+                )}`}
+                rating={item.rating}
                 isFavorite={favoriteIds.has(item.id)}
                 onToggleFavorite={async () => {
                   if (!user) return;
@@ -451,9 +536,15 @@ export default function SearchResults() {
                   setFilterOpen((v) => !v);
                   setSortOpen(false);
                 },
-                badge: filterBy !== "All",
+                badge: isFilterActive,
               },
-                { label: t("search.list"), onPress: () => setViewMode("list") },
+              {
+                label: t("search.list"),
+                onPress: () => {
+                  closeMenus();
+                  setViewMode("list");
+                },
+              },
               ]}
             />
             <SortFilterMenus />
@@ -492,7 +583,8 @@ export default function SearchResults() {
                   location={item.location}
                   meta={`${t(toTypeKey(item.category))} - ${toDistanceLabel(
                     item.distance_meters
-                  )} - ${t("label.rating")} ${item.rating ?? "-"}`}
+                  )}`}
+                  rating={item.rating}
                   isFavorite={favoriteIds.has(item.id)}
                   onToggleFavorite={async () => {
                     if (!user) return;
@@ -646,6 +738,58 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: colors.surfaceSoft,
+  },
+  applyWrap: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.surfaceSoft,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  applyButton: {
+    backgroundColor: colors.textPrimary,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  clearButton: {
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  applyButtonText: {
+    color: colors.background,
+    fontWeight: "700",
+  },
+  clearButtonText: {
+    color: colors.textPrimary,
+  },
+  optionRow: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  optionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  optionChipSelected: {
+    backgroundColor: colors.textPrimary,
+    borderColor: colors.textPrimary,
+  },
+  optionChipText: {
+    color: colors.textPrimary,
+    fontWeight: "600",
+    fontSize: 12,
+  },
+  optionChipTextSelected: {
+    color: colors.background,
   },
   sliderLabel: {
     fontWeight: "600",

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   TextInput,
   FlatList,
-  Image,
 } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
@@ -18,6 +17,7 @@ import ServiceCard from "../../../components/ServiceCard";
 import CategoryButton from "../../../components/CategoryButton";
 import UIDateTimeField from "../../../components/UIDateTimeField";
 import UIWheelSelectField from "../../../components/UIWheelSelectField";
+import TabTopNotch from "../../../components/TabTopNotch";
 import { useI18n } from "../../../lib/i18n";
 import { colors } from "../../../lib/theme";
 import {
@@ -54,10 +54,6 @@ export default function GuestHome() {
     { label: t("category.shower"), icon: "shower" },
     { label: t("category.storage"), icon: "locker" },
   ];
-  const logoModule = require("../../../assets/images/Jungle_Logo_Green.svg") as any;
-  const Logo = (logoModule?.default ?? logoModule) as any;
-  const canRenderSvg = typeof Logo === "function" || typeof Logo === "object";
-
   useEffect(() => {
     let isMounted = true;
     setLoadingServices(true);
@@ -193,8 +189,8 @@ export default function GuestHome() {
       pathname: "/(tabs)/guest/ServiceDetails",
       params: {
         serviceId: item.id,
-        destination: destination || "Default Destination",
-        timeslot: date && time ? `${date} ${time}` : "Anytime",
+        destination: item.location,
+        timeslot: date && time ? `${date} ${time}` : "",
         people: people || "1",
         microservice: item.title,
       },
@@ -206,21 +202,7 @@ export default function GuestHome() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <View
-        style={[
-          styles.fixedNotch,
-          { top: insets.top },
-        ]}
-      >
-        {canRenderSvg ? (
-          <Logo width={148} height={148} />
-        ) : (
-          <Image
-            source={require("../../../assets/images/android-icon-foreground.png")}
-            style={styles.brandFallbackLogo}
-          />
-        )}
-      </View>
+      <TabTopNotch />
       <ScrollView
         contentContainerStyle={[
           styles.container,
@@ -259,7 +241,12 @@ export default function GuestHome() {
                 ))}
               </View>
             )}
-            <View style={styles.inputWithIcon}>
+            <View
+              style={[
+                styles.inputWithIcon,
+                showSuggestions && locationSuggestions.length > 0 && styles.inputWithIconNoGap,
+              ]}
+            >
               <MaterialCommunityIcons
                 name="map-marker"
                 size={18}
@@ -369,6 +356,7 @@ export default function GuestHome() {
                 item.image_url ? { uri: item.image_url } : placeholderImage
               }
               meta={t(toTypeKey(item.category))}
+              rating={item.rating}
               isFavorite={favoriteIds.has(item.id)}
               onToggleFavorite={async () => {
                 if (!user) return;
@@ -417,6 +405,7 @@ export default function GuestHome() {
                 item.image_url ? { uri: item.image_url } : placeholderImage
               }
               meta={t(toTypeKey(item.category))}
+              rating={item.rating}
               isFavorite={favoriteIds.has(item.id)}
               onToggleFavorite={async () => {
                 if (!user) return;
@@ -449,22 +438,6 @@ export default function GuestHome() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.screenBackground },
   container: { padding: 16, paddingBottom: 24 },
-  fixedNotch: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 48,
-    backgroundColor: "#2E6A52",
-    alignItems: "flex-start",
-    justifyContent: "center",
-    paddingLeft: 20,
-    zIndex: 50,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
   brandBar: {
     height: 54,
     borderRadius: 16,
@@ -473,11 +446,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "visible",
-  },
-  brandFallbackLogo: {
-    width: 148,
-    height: 148,
-    marginLeft: 12,
   },
   categories: {
     flexDirection: "row",
@@ -544,6 +512,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: colors.background,
   },
+  inputWithIconNoGap: {
+    marginBottom: 0,
+  },
   inputField: {
     flex: 1,
     paddingVertical: 2,
@@ -573,7 +544,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   dropdown: {
-    marginTop: 6,
+    marginTop: 0,
     backgroundColor: colors.background,
     borderRadius: 8,
     borderWidth: 1,
@@ -598,7 +569,7 @@ const styles = StyleSheet.create({
   },
   searchButtonText: {
     color: colors.background,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   horizontalList: {
     overflow: "visible",

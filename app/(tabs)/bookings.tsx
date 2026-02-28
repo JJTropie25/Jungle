@@ -15,6 +15,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { supabase } from "../../lib/supabase";
 import { useAuthState } from "../../lib/auth";
 import { colors } from "../../lib/theme";
+import TabTopNotch from "../../components/TabTopNotch";
 
 export default function Bookings() {
   const router = useRouter();
@@ -95,10 +96,11 @@ export default function Bookings() {
 
   return (
     <SafeAreaView style={styles.screen}>
+      <TabTopNotch />
       <ScrollView
         contentContainerStyle={[
           styles.container,
-          { paddingTop: insets.top + 16 },
+          { paddingTop: insets.top + 58 },
         ]}
       >
         <Text style={styles.title}>{t("bookings.title")}</Text>

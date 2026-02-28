@@ -2,6 +2,7 @@ import { Text, StyleSheet, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import ServiceCard from "../../components/ServiceCard";
+import TabTopNotch from "../../components/TabTopNotch";
 import { useI18n } from "../../lib/i18n";
 import { colors } from "../../lib/theme";
 import { useAuthState } from "../../lib/auth";
@@ -66,10 +67,11 @@ export default function Favorites() {
 
   return (
     <SafeAreaView style={styles.screen}>
+      <TabTopNotch />
       <ScrollView
         contentContainerStyle={[
           styles.container,
-          { paddingTop: insets.top + 16 },
+          { paddingTop: insets.top + 58 },
         ]}
       >
         <Text style={styles.title}>{t("favorites.title")}</Text>
@@ -90,7 +92,8 @@ export default function Favorites() {
               title={item.title}
               price={toPriceLabel(item.price_eur)}
               location={item.location}
-              meta={`${t(toTypeKey(item.category))} ? ${t("label.rating")} ${item.rating ?? "-"}`}
+              meta={t(toTypeKey(item.category))}
+              rating={item.rating}
               isFavorite={favoriteIds.has(item.id)}
               onToggleFavorite={async () => {
                 if (!user) return;

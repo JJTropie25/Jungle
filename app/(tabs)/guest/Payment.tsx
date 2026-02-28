@@ -128,11 +128,16 @@ export default function Payment() {
           <Text style={styles.summaryTitle}>{microservice ?? "-"}</Text>
           <Text style={styles.summaryLine}>{destination ?? "-"}</Text>
           <Text style={styles.summaryLine}>{timeslot ?? "-"}</Text>
+          <View style={styles.summaryPeople}>
+            <MaterialCommunityIcons
+              name="account-group"
+              size={16}
+              color={colors.textPrimary}
+            />
+            <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
+          </View>
           <Text style={styles.summaryLine}>
-            {t("home.people")}: {people ?? "-"}
-          </Text>
-          <Text style={styles.summaryLine}>
-            {t("service.availableTimes")}: {selectedHour ?? "-"}
+            Selected times: {selectedHour ?? "-"}
           </Text>
         </View>
 
@@ -213,6 +218,16 @@ const styles = StyleSheet.create({
   summaryLine: {
     color: colors.textSecondary,
     marginBottom: 2,
+  },
+  summaryPeople: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2,
+  },
+  summaryPeopleText: {
+    color: colors.textSecondary,
+    fontWeight: "600",
   },
   methodRow: {
     flexDirection: "row",

@@ -1,13 +1,12 @@
-import { View } from "react-native";
 import Slider from "@react-native-community/slider/dist/Slider";
+import { StyleSheet } from "react-native";
 
 export default function UISlider(props: any) {
-  return (
-    <View
-      onStartShouldSetResponder={() => true}
-      onMoveShouldSetResponder={() => true}
-    >
-      <Slider {...props} />
-    </View>
-  );
+  return <Slider {...props} style={[styles.slider, props?.style]} />;
 }
+
+const styles = StyleSheet.create({
+  slider: {
+    height: 40,
+  },
+});

@@ -37,6 +37,8 @@ export default function ServiceDetails() {
   const [loadingSlots, setLoadingSlots] = useState(true);
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [serviceTitle, setServiceTitle] = useState<string | null>(null);
+  const [serviceLocation, setServiceLocation] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const reviews = useMemo(
     () => [
@@ -106,12 +108,14 @@ export default function ServiceDetails() {
     if (!serviceId || !supabase) return;
     supabase
       .from("services")
-      .select("image_url")
+      .select("title, location, image_url")
       .eq("id", serviceId)
       .single()
       .then(({ data }) => {
         if (!isMounted) return;
         setImageUrl(data?.image_url ?? null);
+        setServiceTitle(data?.title ?? null);
+        setServiceLocation(data?.location ?? null);
       });
     return () => {
       isMounted = false;
@@ -166,6 +170,8 @@ export default function ServiceDetails() {
     }
     return slots.map((s) => s.time);
   }, [slots]);
+  const summaryTitle = serviceTitle ?? microservice ?? "-";
+  const summaryLocation = serviceLocation ?? destination ?? "-";
 
   const handleBooking = async () => {
     if (!user) {
@@ -186,10 +192,10 @@ export default function ServiceDetails() {
         serviceId,
         slotStart,
         slotEnd,
-        destination,
-        timeslot,
+        destination: serviceLocation ?? destination ?? "",
+        timeslot: selectedHour ?? timeslot ?? "",
         people,
-        microservice,
+        microservice: serviceTitle ?? microservice ?? "",
         selectedHour,
       },
     });
@@ -213,12 +219,9 @@ export default function ServiceDetails() {
             <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
           <View style={styles.summaryContent}>
-            <View style={styles.summaryLine}>
-              <Text style={styles.summaryItem}>{microservice ?? "-"}</Text>
-              <Text style={styles.summarySep}>|</Text>
-              <Text style={styles.summaryItem}>{destination ?? "-"}</Text>
-              <Text style={styles.summarySep}>|</Text>
-              <Text style={styles.summaryItem}>{timeslot ?? "-"}</Text>
+            <Text style={styles.summaryTitle}>{summaryTitle}</Text>
+            <View style={styles.summaryMetaLine}>
+              <Text style={styles.summaryItem}>{summaryLocation}</Text>
               <Text style={styles.summarySep}>|</Text>
               <View style={styles.summaryPeople}>
                 <MaterialCommunityIcons
@@ -343,8 +346,12 @@ const styles = StyleSheet.create({
   summaryContent: {
     flex: 1,
   },
-  summaryText: { fontWeight: "600" },
-  summaryLine: {
+  summaryTitle: {
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  summaryMetaLine: {
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",

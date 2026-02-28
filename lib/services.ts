@@ -37,7 +37,7 @@ export async function fetchServices(
 }
 
 export function toPriceLabel(price: number) {
-  return `EUR ${price}`;
+  return `€${price}`;
 }
 
 export function toDistanceLabel(distanceMeters?: number | null) {

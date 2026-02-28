@@ -102,7 +102,13 @@ export default function UIWheelSelectField({
               <View pointerEvents="none" style={styles.rowSelected} />
             </View>
 
-            <Pressable style={styles.done} onPress={() => setOpen(false)}>
+            <Pressable
+              style={styles.done}
+              onPress={() => {
+                onChange(selected);
+                setOpen(false);
+              }}
+            >
               <Text style={styles.doneText}>Done</Text>
             </Pressable>
           </View>

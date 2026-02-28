@@ -10,7 +10,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useI18n } from "../../../lib/i18n";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import QRCode from "react-native-qrcode-svg";
 import { colors } from "../../../lib/theme";
@@ -31,6 +31,9 @@ export default function BookingConfirmation() {
     }>();
   const [token, setToken] = useState<string | null>(qrToken ?? null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [serviceTitle, setServiceTitle] = useState<string | null>(null);
+  const [serviceLocation, setServiceLocation] = useState<string | null>(null);
+  const [slotStart, setSlotStart] = useState<string | null>(null);
   const placeholderImage = require("../../../assets/images/react-logo.png");
 
   useEffect(() => {
@@ -38,18 +41,36 @@ export default function BookingConfirmation() {
     if (!supabase || !bookingId) return;
     supabase
       .from("bookings")
-      .select("qr_token, service:services(image_url)")
+      .select("qr_token, slot_start, service:services(title, location, image_url)")
       .eq("id", bookingId)
       .single()
       .then(({ data }) => {
         if (!isMounted) return;
         if (data?.qr_token) setToken(data.qr_token);
+        if (data?.slot_start) setSlotStart(data.slot_start);
+        if (data?.service?.title) setServiceTitle(data?.service?.title ?? null);
+        if (data?.service?.location) setServiceLocation(data?.service?.location ?? null);
         if (data?.service?.image_url) setImageUrl(data?.service?.image_url ?? null);
       });
     return () => {
       isMounted = false;
     };
   }, [bookingId]);
+
+  const fallbackTimeslot = useMemo(() => {
+    if (!slotStart) return null;
+    const d = new Date(slotStart);
+    if (Number.isNaN(d.getTime())) return null;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate()
+    ).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(
+      d.getMinutes()
+    ).padStart(2, "0")}`;
+  }, [slotStart]);
+
+  const summaryTitle = serviceTitle ?? microservice ?? "-";
+  const summaryDestination = serviceLocation ?? destination ?? "-";
+  const summaryTimeslot = selectedHour ?? timeslot ?? fallbackTimeslot ?? "-";
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -67,13 +88,13 @@ export default function BookingConfirmation() {
             source={imageUrl ? { uri: imageUrl } : placeholderImage}
             style={styles.cardImage}
           />
-          <Text style={styles.cardTitle}>{microservice}</Text>
+          <Text style={styles.cardTitle}>{summaryTitle}</Text>
           <View style={styles.summaryLine}>
-            <Text style={styles.summaryItem}>{microservice ?? "-"}</Text>
+            <Text style={styles.summaryItem}>{summaryTitle}</Text>
             <Text style={styles.summarySep}>|</Text>
-            <Text style={styles.summaryItem}>{destination ?? "-"}</Text>
+            <Text style={styles.summaryItem}>{summaryDestination}</Text>
             <Text style={styles.summarySep}>|</Text>
-            <Text style={styles.summaryItem}>{timeslot ?? "-"}</Text>
+            <Text style={styles.summaryItem}>{summaryTimeslot}</Text>
             <Text style={styles.summarySep}>|</Text>
             <View style={styles.summaryPeople}>
               <MaterialCommunityIcons
@@ -84,7 +105,6 @@ export default function BookingConfirmation() {
               <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
             </View>
           </View>
-          <Text>{selectedHour}</Text>
           <View style={styles.buttonRow}>
             <TouchableOpacity
               style={styles.cardButton}
@@ -92,9 +112,9 @@ export default function BookingConfirmation() {
                 router.push({
                   pathname: "/(tabs)/guest/Directions",
                   params: {
-                    microservice,
-                    destination,
-                    timeslot,
+                    microservice: summaryTitle,
+                    destination: summaryDestination,
+                    timeslot: summaryTimeslot,
                     people,
                   },
                 })
@@ -110,9 +130,9 @@ export default function BookingConfirmation() {
                   params: {
                     bookingId,
                     qrToken,
-                    microservice,
-                    destination,
-                    timeslot,
+                    microservice: summaryTitle,
+                    destination: summaryDestination,
+                    timeslot: summaryTimeslot,
                     people,
                   },
                 })

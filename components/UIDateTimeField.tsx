@@ -102,6 +102,17 @@ export default function UIDateTimeField({
     const month = viewDate.toLocaleString("default", { month: "long" });
     return `${month} ${viewDate.getFullYear()}`;
   }, [viewDate]);
+  const todayStart = useMemo(() => {
+    const t = new Date();
+    return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  }, []);
+  const currentMonthStart = useMemo(
+    () => new Date(todayStart.getFullYear(), todayStart.getMonth(), 1),
+    [todayStart]
+  );
+  const prevMonthDisabled =
+    new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1) <
+    currentMonthStart;
 
   const daysGrid = useMemo(() => {
     const year = viewDate.getFullYear();
@@ -143,17 +154,19 @@ export default function UIDateTimeField({
               <View>
                 <View style={styles.modalHeader}>
                   <Pressable
-                    style={styles.navButton}
-                    onPress={() =>
+                    style={[styles.navButton, prevMonthDisabled && styles.navButtonDisabled]}
+                    disabled={prevMonthDisabled}
+                    onPress={() => {
+                      if (prevMonthDisabled) return;
                       setViewDate(
                         (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
-                      )
-                    }
+                      );
+                    }}
                   >
                     <MaterialCommunityIcons
                       name="chevron-left"
                       size={20}
-                      color={colors.textPrimary}
+                      color={prevMonthDisabled ? colors.textMuted : colors.textPrimary}
                     />
                   </Pressable>
                   <Text style={styles.monthLabel}>{monthLabel}</Text>
@@ -182,6 +195,12 @@ export default function UIDateTimeField({
                 <View style={styles.grid}>
                   {daysGrid.map((day, index) => {
                     if (!day) return <View key={index} style={styles.dayCell} />;
+                    const candidate = new Date(
+                      viewDate.getFullYear(),
+                      viewDate.getMonth(),
+                      day
+                    );
+                    const isPastDate = candidate < todayStart;
                     const isSelected =
                       selectedDate &&
                       selectedDate.getFullYear() === viewDate.getFullYear() &&
@@ -190,11 +209,14 @@ export default function UIDateTimeField({
                     return (
                       <Pressable
                         key={index}
+                        disabled={isPastDate}
                         style={[
                           styles.dayCell,
+                          isPastDate && styles.dayCellDisabled,
                           isSelected && styles.daySelected,
                         ]}
                         onPress={() => {
+                          if (isPastDate) return;
                           const next = new Date(
                             viewDate.getFullYear(),
                             viewDate.getMonth(),
@@ -207,6 +229,7 @@ export default function UIDateTimeField({
                         <Text
                           style={[
                             styles.dayLabel,
+                            isPastDate && styles.dayLabelDisabled,
                             isSelected && styles.dayLabelSelected,
                           ]}
                         >
@@ -303,7 +326,10 @@ export default function UIDateTimeField({
                 </View>
                 <Pressable
                   style={styles.done}
-                  onPress={() => setOpen(false)}
+                  onPress={() => {
+                    onChange(`${selectedTime.h}:${selectedTime.m}`);
+                    setOpen(false);
+                  }}
                 >
                   <Text style={styles.doneText}>Done</Text>
                 </Pressable>
@@ -356,6 +382,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.surfaceSoft,
   },
+  navButtonDisabled: {
+    opacity: 0.55,
+  },
   monthLabel: {
     fontWeight: "700",
     color: colors.textPrimary,
@@ -386,6 +415,12 @@ const styles = StyleSheet.create({
   dayLabel: {
     color: colors.textPrimary,
     fontWeight: "600",
+  },
+  dayCellDisabled: {
+    opacity: 0.45,
+  },
+  dayLabelDisabled: {
+    color: colors.textMuted,
   },
   daySelected: {
     backgroundColor: colors.textPrimary,
