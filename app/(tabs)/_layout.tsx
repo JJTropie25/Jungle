@@ -14,10 +14,10 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: "transparent" },
         tabBarStyle: {
           backgroundColor: "rgba(255,255,255,0.94)",
-          borderTopColor: "rgba(111,182,154,0.55)",
+          borderTopColor: "rgba(79,155,155,0.55)",
         },
         tabBarActiveTintColor: colors.textPrimary,
-        tabBarInactiveTintColor: "#245845",
+        tabBarInactiveTintColor: colors.textSecondary,
         tabBarLabelStyle: {
           fontWeight: "600",
         },
@@ -38,7 +38,7 @@ export default function TabsLayout() {
                 <MaterialCommunityIcons
                   name="home-outline"
                   size={Math.max(22, size)}
-                  color="#245845"
+                  color={colors.textSecondary}
                   style={{ position: "absolute", top: 0, left: 0 }}
                 />
               </View>
@@ -46,7 +46,7 @@ export default function TabsLayout() {
               <MaterialCommunityIcons
                 name="home-outline"
                 size={Math.max(22, size)}
-                color="#245845"
+                color={colors.textSecondary}
               />
             )
           ),
@@ -73,7 +73,7 @@ export default function TabsLayout() {
                 <MaterialCommunityIcons
                   name="star-outline"
                   size={Math.max(22, size)}
-                  color="#245845"
+                  color={colors.textSecondary}
                   style={{ position: "absolute", top: 0, left: 0 }}
                 />
               </View>
@@ -81,7 +81,7 @@ export default function TabsLayout() {
               <MaterialCommunityIcons
                 name="star-outline"
                 size={Math.max(22, size)}
-                color="#245845"
+                color={colors.textSecondary}
               />
             )
           ),
@@ -102,7 +102,7 @@ export default function TabsLayout() {
                 <MaterialCommunityIcons
                   name="briefcase-outline"
                   size={Math.max(22, size)}
-                  color="#245845"
+                  color={colors.textSecondary}
                   style={{ position: "absolute", top: 0, left: 0 }}
                 />
               </View>
@@ -110,7 +110,7 @@ export default function TabsLayout() {
               <MaterialCommunityIcons
                 name="briefcase-outline"
                 size={Math.max(22, size)}
-                color="#245845"
+                color={colors.textSecondary}
               />
             )
           ),
@@ -131,7 +131,7 @@ export default function TabsLayout() {
                 <MaterialCommunityIcons
                   name="account-circle-outline"
                   size={Math.max(22, size)}
-                  color="#245845"
+                  color={colors.textSecondary}
                   style={{ position: "absolute", top: 0, left: 0 }}
                 />
               </View>
@@ -139,7 +139,7 @@ export default function TabsLayout() {
               <MaterialCommunityIcons
                 name="account-circle-outline"
                 size={Math.max(22, size)}
-                color="#245845"
+                color={colors.textSecondary}
               />
             )
           ),

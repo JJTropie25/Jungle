@@ -458,12 +458,12 @@ const styles = StyleSheet.create({
   },
   bookButton: {
     padding: 16,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.warmAccent,
     borderRadius: 10,
     alignItems: "center",
   },
   bookButtonDisabled: {
-    backgroundColor: colors.textMuted,
+    backgroundColor: colors.warmAccentSoft,
   },
   bookText: {
     color: colors.background,

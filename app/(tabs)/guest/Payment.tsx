@@ -15,7 +15,7 @@ import { supabase } from "../../../lib/supabase";
 import { colors } from "../../../lib/theme";
 import { useAppDialog } from "../../../components/AppDialogProvider";
 
-type PaymentMethod = "card" | "wallet";
+type PaymentMethod = "card" | "wallet" | "cash";
 
 export default function Payment() {
   const router = useRouter();
@@ -43,7 +43,7 @@ export default function Payment() {
     selectedHour?: string;
   }>();
 
-  const [method, setMethod] = useState<PaymentMethod>("card");
+  const [method, setMethod] = useState<PaymentMethod>("cash");
   const [processing, setProcessing] = useState(false);
 
   const handlePay = async () => {
@@ -85,12 +85,14 @@ export default function Payment() {
       return;
     }
 
-    await dialog.alert(
-      t("payment.successTitle"),
-      t("payment.successDetail", {
-        method: method === "card" ? t("payment.methodCard") : t("payment.methodWallet"),
-      })
-    );
+    const methodLabel =
+      method === "card"
+        ? t("payment.methodCard")
+        : method === "wallet"
+        ? t("payment.methodWallet")
+        : "Pay in cash at the property";
+
+    await dialog.alert(t("payment.successTitle"), t("payment.successDetail", { method: methodLabel }));
 
     router.replace({
       pathname: "/(tabs)/guest/BookingConfirmation",
@@ -141,23 +143,34 @@ export default function Payment() {
           </Text>
         </View>
 
-        <View style={styles.methodRow}>
+        <View style={styles.methodColumn}>
           <TouchableOpacity
-            style={[styles.methodCard, method === "card" && styles.methodCardSelected]}
-            onPress={() => setMethod("card")}
+            activeOpacity={1}
+            disabled
+            style={[styles.methodCard, styles.methodCardDisabled]}
           >
-            <MaterialCommunityIcons name="credit-card-outline" size={22} color={colors.textPrimary} />
+            <MaterialCommunityIcons name="credit-card-outline" size={22} color={colors.textMuted} />
             <Text style={styles.methodTitle}>{t("payment.methodCard")}</Text>
-            <Text style={styles.methodHint}>{t("payment.mockHint")}</Text>
+            <Text style={styles.methodHintDisabled}>Coming soon</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.methodCard, method === "wallet" && styles.methodCardSelected]}
-            onPress={() => setMethod("wallet")}
+            activeOpacity={1}
+            disabled
+            style={[styles.methodCard, styles.methodCardDisabled]}
           >
-            <MaterialCommunityIcons name="wallet-outline" size={22} color={colors.textPrimary} />
+            <MaterialCommunityIcons name="wallet-outline" size={22} color={colors.textMuted} />
             <Text style={styles.methodTitle}>{t("payment.methodWallet")}</Text>
-            <Text style={styles.methodHint}>{t("payment.mockHint")}</Text>
+            <Text style={styles.methodHintDisabled}>Coming soon</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.methodCard, method === "cash" && styles.methodCardSelected]}
+            onPress={() => setMethod("cash")}
+          >
+            <MaterialCommunityIcons name="cash" size={22} color={colors.warmAccentDark} />
+            <Text style={styles.methodTitle}>Pay in cash at the property</Text>
+            <Text style={styles.methodHint}>Available now</Text>
           </TouchableOpacity>
         </View>
 
@@ -229,13 +242,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: "600",
   },
-  methodRow: {
-    flexDirection: "row",
+  methodColumn: {
     gap: 10,
     marginBottom: 18,
   },
   methodCard: {
-    flex: 1,
+    width: "100%",
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
@@ -248,9 +260,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 7,
   },
+  methodCardDisabled: {
+    opacity: 0.55,
+    backgroundColor: colors.surface,
+  },
   methodCardSelected: {
-    borderColor: colors.textPrimary,
-    backgroundColor: colors.border,
+    borderColor: colors.warmAccent,
+    backgroundColor: colors.warmSurface,
   },
   methodTitle: {
     fontWeight: "700",
@@ -258,6 +274,10 @@ const styles = StyleSheet.create({
   },
   methodHint: {
     color: colors.textSecondary,
+    fontSize: 12,
+  },
+  methodHintDisabled: {
+    color: colors.textMuted,
     fontSize: 12,
   },
   payButton: {

@@ -749,23 +749,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   applyButton: {
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.warmAccent,
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 16,
     alignItems: "center",
   },
   clearButton: {
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: colors.warmSurface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.warmAccentSoft,
   },
   applyButtonText: {
     color: colors.background,
     fontWeight: "700",
   },
   clearButtonText: {
-    color: colors.textPrimary,
+    color: colors.warmAccentDark,
   },
   optionRow: {
     gap: 8,
@@ -780,8 +780,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   optionChipSelected: {
-    backgroundColor: colors.textPrimary,
-    borderColor: colors.textPrimary,
+    backgroundColor: colors.warmAccent,
+    borderColor: colors.warmAccent,
   },
   optionChipText: {
     color: colors.textPrimary,
@@ -806,7 +806,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: colors.surface,
   },
 });
 

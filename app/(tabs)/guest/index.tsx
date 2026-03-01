@@ -29,6 +29,7 @@ import {
 import { useAuthState } from "../../../lib/auth";
 import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favorites";
 import { getRecentlyViewedIds } from "../../../lib/recentlyViewed";
+import { acceptPolicy, hasAcceptedPolicy } from "../../../lib/policy";
 
 export default function GuestHome() {
   const router = useRouter();
@@ -49,6 +50,7 @@ export default function GuestHome() {
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showPolicyBanner, setShowPolicyBanner] = useState(false);
   const categories = [
     { label: t("category.rest"), icon: "bed-king" },
     { label: t("category.shower"), icon: "shower" },
@@ -86,6 +88,23 @@ export default function GuestHome() {
       isMounted = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!user?.id) {
+      setShowPolicyBanner(false);
+      return () => {
+        mounted = false;
+      };
+    }
+    hasAcceptedPolicy(user.id).then((accepted) => {
+      if (!mounted) return;
+      setShowPolicyBanner(!accepted);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
 
   useFocusEffect(
     useMemo(
@@ -126,12 +145,14 @@ export default function GuestHome() {
   const recentlyViewed = useMemo(() => {
     if (services.length === 0) return [];
     const byId = new Map(services.map((s) => [s.id, s]));
-    const ordered = recentIds
+    const viewedFirst = recentIds
       .map((id) => byId.get(id))
       .filter((item): item is Service => Boolean(item));
-    if (ordered.length > 0) return ordered.slice(0, 10);
-    const shuffled = [...services].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 10);
+
+    const remaining = services.filter((item) => !recentIds.includes(item.id));
+    const shuffledRemaining = [...remaining].sort(() => Math.random() - 0.5);
+
+    return [...viewedFirst, ...shuffledRemaining].slice(0, 10);
   }, [recentIds, services]);
 
   const aroundYou = useMemo(() => {
@@ -431,6 +452,31 @@ export default function GuestHome() {
           )}
         />
       </ScrollView>
+      {showPolicyBanner ? (
+        <View style={styles.policyOverlay}>
+          <View style={styles.policyCard}>
+            <Text style={styles.policyTitle}>{t("policy.title")}</Text>
+            <Text style={styles.policyText}>
+              {t("policy.line1")}
+            </Text>
+            <Text style={styles.policyText}>
+              {t("policy.line2")}
+            </Text>
+            <Text style={styles.policyText}>
+              {t("policy.line3")}
+            </Text>
+            <TouchableOpacity
+              style={styles.policyAcceptButton}
+              onPress={async () => {
+                await acceptPolicy(user?.id);
+                setShowPolicyBanner(false);
+              }}
+            >
+              <Text style={styles.policyAcceptText}>{t("policy.accept")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -441,7 +487,7 @@ const styles = StyleSheet.create({
   brandBar: {
     height: 54,
     borderRadius: 16,
-    backgroundColor: "#0B3D2E",
+    backgroundColor: colors.textPrimary,
     marginBottom: 14,
     alignItems: "center",
     justifyContent: "center",
@@ -560,12 +606,12 @@ const styles = StyleSheet.create({
   searchButton: {
     marginTop: 8,
     padding: 14,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.warmAccent,
     borderRadius: 8,
     alignItems: "center",
   },
   searchButtonDisabled: {
-    backgroundColor: colors.textMuted,
+    backgroundColor: colors.warmAccentSoft,
   },
   searchButtonText: {
     color: colors.background,
@@ -577,6 +623,48 @@ const styles = StyleSheet.create({
   horizontalListContent: {
     paddingVertical: 8,
     paddingHorizontal: 2,
+  },
+  policyOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    padding: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15,78,78,0.25)",
+  },
+  policyCard: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    width: "100%",
+    maxWidth: 420,
+    padding: 14,
+    gap: 8,
+  },
+  policyTitle: {
+    color: colors.textPrimary,
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  policyText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  policyAcceptButton: {
+    marginTop: 6,
+    backgroundColor: colors.warmAccent,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  policyAcceptText: {
+    color: colors.background,
+    fontWeight: "700",
   },
 });
 

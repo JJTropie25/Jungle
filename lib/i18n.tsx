@@ -119,6 +119,14 @@ const translations: Translations = {
     "payment.invalidData": "Missing payment data. Please go back and try again.",
     "payment.successTitle": "Payment successful",
     "payment.successDetail": "Paid with {method}. Your booking is now confirmed.",
+    "policy.title": "Policy",
+    "policy.line1":
+      "1) Platform role: The platform facilitates service booking between user and property. The service is provided directly by the hosting property.",
+    "policy.line2":
+      "2) Payment: Payment is made directly at the property, unless otherwise specified. The platform does not hold funds during the testing phase.",
+    "policy.line3":
+      "3) Responsibility: Any damages, delays, or disputes are handled directly between user and property.",
+    "policy.accept": "Accept",
   },
   it: {
     "tabs.home": "Home",
@@ -234,6 +242,14 @@ const translations: Translations = {
     "payment.invalidData": "Dati pagamento mancanti. Torna indietro e riprova.",
     "payment.successTitle": "Pagamento riuscito",
     "payment.successDetail": "Pagato con {method}. La prenotazione e confermata.",
+    "policy.title": "Policy",
+    "policy.line1":
+      "1) Ruolo della piattaforma: La piattaforma fornita facilita la prenotazione del servizio tra utente e struttura. Il servizio e fornito direttamente dalla struttura ospitante.",
+    "policy.line2":
+      "2) Pagamento: Il pagamento avviene direttamente presso la struttura, salvo diversa indicazione. La piattaforma non trattiene fondi durante la fase di test.",
+    "policy.line3":
+      "3) Responsabilita: Eventuali danni, ritardi o controversie sono gestiti direttamente tra utente e struttura.",
+    "policy.accept": "Accetto",
   },
   es: {
     "tabs.home": "Inicio",
@@ -349,6 +365,14 @@ const translations: Translations = {
     "payment.invalidData": "Faltan datos de pago. Vuelve atras e intentalo de nuevo.",
     "payment.successTitle": "Pago completado",
     "payment.successDetail": "Pagado con {method}. Tu reserva ya esta confirmada.",
+    "policy.title": "Politica",
+    "policy.line1":
+      "1) Rol de la plataforma: La plataforma facilita la reserva del servicio entre usuario y establecimiento. El servicio es prestado directamente por el establecimiento anfitrion.",
+    "policy.line2":
+      "2) Pago: El pago se realiza directamente en el establecimiento, salvo indicacion diferente. La plataforma no retiene fondos durante la fase de prueba.",
+    "policy.line3":
+      "3) Responsabilidad: Cualquier dano, retraso o disputa se gestiona directamente entre usuario y establecimiento.",
+    "policy.accept": "Aceptar",
   },
   zh: {
     "tabs.home": "??",
@@ -464,6 +488,14 @@ const translations: Translations = {
     "payment.invalidData": "????????????????",
     "payment.successTitle": "????",
     "payment.successDetail": "??{method}??????",
+    "policy.title": "Policy",
+    "policy.line1":
+      "1) Platform role: The platform facilitates booking between user and property. Service is provided directly by the hosting property.",
+    "policy.line2":
+      "2) Payment: Payment is made directly at the property unless otherwise stated. The platform does not hold funds during testing.",
+    "policy.line3":
+      "3) Responsibility: Any damages, delays, or disputes are handled directly between user and property.",
+    "policy.accept": "Accept",
   },
 };
 
@@ -473,7 +505,22 @@ type I18nContextValue = {
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
-const I18nContext = createContext<I18nContextValue | null>(null);
+const fallbackI18nContext: I18nContextValue = {
+  language: "en",
+  setLanguage: () => undefined,
+  t: (key: string, params?: Record<string, string | number>) => {
+    const dict = translations.en;
+    let str = dict[key] ?? key;
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        str = str.replace(new RegExp(`\{${k}\}`, "g"), String(v));
+      }
+    }
+    return str;
+  },
+};
+
+const I18nContext = createContext<I18nContextValue>(fallbackI18nContext);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>("en");
@@ -496,9 +543,5 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useI18n() {
-  const ctx = useContext(I18nContext);
-  if (!ctx) {
-    throw new Error("useI18n must be used within I18nProvider");
-  }
-  return ctx;
+  return useContext(I18nContext);
 }

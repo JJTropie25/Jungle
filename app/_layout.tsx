@@ -13,7 +13,7 @@ export default function RootLayout() {
       <AppDialogProvider>
         <View style={styles.root}>
           <LinearGradient
-            colors={["#2E6A52", "#DFF2E8", "#FFFFFF"]}
+            colors={["#166A6A", "#A5D3D3", "#E2F2F2"]}
             locations={[0, 0.45, 1]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
@@ -23,7 +23,11 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "transparent" } }} />
           <LinearGradient
             pointerEvents="none"
-            colors={["rgba(24,59,45,0.34)", "rgba(46,106,82,0.14)", "rgba(255,255,255,0.02)"]}
+            colors={[
+              "rgba(15,78,78,0.32)",
+              "rgba(22,106,106,0.16)",
+              "rgba(226,242,242,0.02)",
+            ]}
             locations={[0, 0.35, 1]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}

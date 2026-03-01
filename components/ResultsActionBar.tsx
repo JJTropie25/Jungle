@@ -16,7 +16,7 @@ export default function ResultsActionBar({ actions }: { actions: Action[] }) {
           style={styles.button}
           onPress={action.onPress}
         >
-          <Text>{action.label}</Text>
+          <Text style={styles.buttonText}>{action.label}</Text>
           {action.badge ? <View style={styles.badge} /> : null}
         </TouchableOpacity>
       ))}
@@ -34,10 +34,16 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 4,
     padding: 12,
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: colors.warmSurface,
+    borderWidth: 1,
+    borderColor: colors.warmAccentSoft,
     borderRadius: 8,
     alignItems: "center",
     position: "relative",
+  },
+  buttonText: {
+    color: colors.warmAccentDark,
+    fontWeight: "700",
   },
   badge: {
     position: "absolute",
@@ -46,6 +52,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.warmAccentDark,
   },
 });

@@ -243,7 +243,9 @@ const styles = StyleSheet.create({
   cardButton: {
     flex: 1,
     padding: 12,
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: colors.warmSurface,
+    borderWidth: 1,
+    borderColor: colors.warmAccentSoft,
     borderRadius: 8,
     alignItems: "center",
     marginHorizontal: 4,

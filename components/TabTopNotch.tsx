@@ -3,20 +3,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabTopNotch() {
   const insets = useSafeAreaInsets();
-  const logoModule = require("../assets/images/Jungle_Logo_Green.svg") as any;
-  const Logo = (logoModule?.default ?? logoModule) as any;
-  const canRenderSvg = typeof Logo === "function" || typeof Logo === "object";
+  const logo = require("../assets/images/Lagoon_notch.png");
 
   return (
     <View style={[styles.fixedNotch, { top: insets.top }]}>
-      {canRenderSvg ? (
-        <Logo width={148} height={148} />
-      ) : (
-        <Image
-          source={require("../assets/images/android-icon-foreground.png")}
-          style={styles.brandFallbackLogo}
-        />
-      )}
+      <Image source={logo} style={styles.notchLogo} />
     </View>
   );
 }
@@ -27,10 +18,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 48,
-    backgroundColor: "#2E6A52",
+    backgroundColor: "#4F9B9B",
     alignItems: "flex-start",
     justifyContent: "center",
-    paddingLeft: 20,
+    paddingLeft: 14,
     zIndex: 50,
     shadowColor: "#000",
     shadowOpacity: 0.2,
@@ -38,9 +29,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
-  brandFallbackLogo: {
-    width: 148,
-    height: 148,
-    marginLeft: 12,
+  notchLogo: {
+    width: 110,
+    height: 30,
+    resizeMode: "cover",
+    marginTop: -1,
+    marginLeft: -4,
   },
 });
