@@ -4,6 +4,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Linking,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,6 +33,7 @@ export default function ManageBooking() {
       qrToken?: string;
     }>();
   const [token, setToken] = useState<string | null>(qrToken ?? null);
+  const [hostPhone, setHostPhone] = useState<string | null>(null);
   const [canceling, setCanceling] = useState(false);
   const { user } = useAuthState();
 
@@ -65,6 +67,61 @@ export default function ManageBooking() {
         if (!isMounted) return;
         if (data?.qr_token) setToken(data.qr_token);
       });
+    return () => {
+      isMounted = false;
+    };
+  }, [bookingId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!supabase || !bookingId) return;
+
+    const loadHostPhone = async () => {
+      const { data: bookingRow } = await supabase
+        .from("bookings")
+        .select("service_id")
+        .eq("id", bookingId)
+        .maybeSingle();
+      if (!isMounted || !bookingRow?.service_id) return;
+
+      const { data: serviceRow } = await supabase
+        .from("services")
+        .select("host_id")
+        .eq("id", bookingRow.service_id)
+        .maybeSingle();
+      if (!isMounted || !serviceRow?.host_id) return;
+
+      const { data: hostRow } = await supabase
+        .from("hosts")
+        .select("guest_id, phone_country_code, phone_number")
+        .eq("id", serviceRow.host_id)
+        .maybeSingle();
+      if (!isMounted) return;
+
+      if (hostRow?.phone_number) {
+        const compactHost = `${hostRow.phone_country_code ?? ""}${hostRow.phone_number}`.replace(/[^\d+]/g, "");
+        if (compactHost) {
+          setHostPhone(compactHost);
+          return;
+        }
+      }
+      if (!hostRow?.guest_id) return;
+
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("phone_country_code, phone_number")
+        .eq("id", hostRow.guest_id)
+        .maybeSingle();
+      if (!isMounted) return;
+      if (profileRow?.phone_number) {
+        const compact = `${profileRow.phone_country_code ?? ""}${profileRow.phone_number}`.replace(/[^\d+]/g, "");
+        setHostPhone(compact || null);
+      } else {
+        setHostPhone(null);
+      }
+    };
+
+    loadHostPhone();
     return () => {
       isMounted = false;
     };
@@ -219,7 +276,22 @@ export default function ManageBooking() {
           >
             <Text style={styles.actionTextLight}>{t("booking.cancel")}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={async () => {
+              if (!hostPhone) {
+                await dialog.alert(t("booking.contact"), "Host phone is not available.");
+                return;
+              }
+              const url = `tel:${hostPhone}`;
+              const supported = await Linking.canOpenURL(url);
+              if (!supported) {
+                await dialog.alert(t("booking.contact"), "Unable to open phone dialer.");
+                return;
+              }
+              await Linking.openURL(url);
+            }}
+          >
             <Text style={styles.actionText}>{t("booking.contact")}</Text>
           </TouchableOpacity>
         </View>

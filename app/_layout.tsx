@@ -20,9 +20,8 @@ export default function RootLayout() {
             style={StyleSheet.absoluteFill}
           />
 
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "transparent" } }} />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#E2F2F2" } }} />
           <LinearGradient
-            pointerEvents="none"
             colors={[
               "rgba(15,78,78,0.32)",
               "rgba(22,106,106,0.16)",
@@ -31,7 +30,7 @@ export default function RootLayout() {
             locations={[0, 0.35, 1]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFill}
+            style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
           />
 
         </View>

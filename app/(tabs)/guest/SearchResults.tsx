@@ -12,7 +12,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import ServiceCard from "../../../components/ServiceCard";
 import ResultsActionBar from "../../../components/ResultsActionBar";
 import ResultsMap from "../../../components/ResultsMap";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../../../lib/i18n";
 import { colors } from "../../../lib/theme";
 import {
@@ -47,9 +47,11 @@ export default function SearchResults() {
   const CARD_GAP = 12;
   const CARD_SNAP = CARD_WIDTH + CARD_GAP;
 
-  const { destination, timeslot, people, microservice } =
+  const { destination, destinationLat, destinationLon, timeslot, people, microservice } =
     useLocalSearchParams<{
       destination?: string;
+      destinationLat?: string;
+      destinationLon?: string;
       timeslot?: string;
       people?: string;
       microservice?: string;
@@ -112,17 +114,52 @@ export default function SearchResults() {
     return null;
   }, [microservice, t]);
 
+  const destinationCoords = useMemo(() => {
+    const lat = Number(destinationLat);
+    const lon = Number(destinationLon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      return { latitude: lat, longitude: lon };
+    }
+    return null;
+  }, [destinationLat, destinationLon]);
+
+  const distanceForService = useCallback(
+    (item: Service) => {
+      if (
+        destinationCoords &&
+        typeof item.latitude === "number" &&
+        typeof item.longitude === "number"
+      ) {
+        return haversineMeters(
+          destinationCoords.latitude,
+          destinationCoords.longitude,
+          item.latitude,
+          item.longitude
+        );
+      }
+      return item.distance_meters ?? Number.POSITIVE_INFINITY;
+    },
+    [destinationCoords]
+  );
+
   const filteredResults = useMemo(() => {
     let items = services;
     if (normalizedCategory) {
       items = items.filter((s) => s.category === normalizedCategory);
     }
     if (destination) {
-      const needle = destination.toLowerCase();
-      items = items.filter((s) => s.location.toLowerCase().includes(needle));
+      if (destinationCoords) {
+        const radiusMeters = Math.max(1, distanceMax) * 1000;
+        items = items.filter((s) => distanceForService(s) <= radiusMeters);
+      } else {
+        const needle = destination.toLowerCase();
+        items = items.filter((s) => s.location.toLowerCase().includes(needle));
+      }
     }
     items = items.filter((s) => s.price_eur <= priceMax);
-    items = items.filter((s) => (s.distance_meters ?? 0) <= distanceMax * 1000);
+    if (!destinationCoords) {
+      items = items.filter((s) => distanceForService(s) <= distanceMax * 1000);
+    }
     items = items.filter((s) => (s.rating ?? 0) >= ratingMin);
     if (sortBy === "priceUp") {
       items = [...items].sort((a, b) => a.price_eur - b.price_eur);
@@ -131,15 +168,15 @@ export default function SearchResults() {
     } else if (sortBy === "topRated") {
       items = [...items].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
     } else if (sortBy === "nearest") {
-      items = [...items].sort(
-        (a, b) => (a.distance_meters ?? 0) - (b.distance_meters ?? 0)
-      );
+      items = [...items].sort((a, b) => distanceForService(a) - distanceForService(b));
     }
     return items;
   }, [
     services,
     normalizedCategory,
     destination,
+    destinationCoords,
+    distanceForService,
     priceMax,
     distanceMax,
     ratingMin,
@@ -445,7 +482,7 @@ export default function SearchResults() {
                 price={toPriceLabel(item.price_eur)}
                 location={item.location}
                 meta={`${t(toTypeKey(item.category))} - ${toDistanceLabel(
-                  item.distance_meters
+                  distanceForService(item)
                 )}`}
                 rating={item.rating}
                 isFavorite={favoriteIds.has(item.id)}
@@ -580,9 +617,9 @@ export default function SearchResults() {
                   }
                   title={item.title}
                   price={toPriceLabel(item.price_eur)}
-                  location={item.location}
-                  meta={`${t(toTypeKey(item.category))} - ${toDistanceLabel(
-                    item.distance_meters
+                location={item.location}
+                meta={`${t(toTypeKey(item.category))} - ${toDistanceLabel(
+                    distanceForService(item)
                   )}`}
                   rating={item.rating}
                   isFavorite={favoriteIds.has(item.id)}
@@ -809,4 +846,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
 });
+
+function haversineMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthRadiusMeters = 6371000;
+  const deltaLat = toRad(lat2 - lat1);
+  const deltaLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(deltaLon / 2) *
+      Math.sin(deltaLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusMeters * c;
+}
 

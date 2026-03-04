@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,16 +27,13 @@ export default function UIWheelSelectField({
   onChange,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [draftValue, setDraftValue] = useState("");
   const wheelRef = useRef<ScrollView>(null);
   const itemHeight = 52;
   const repeat = 7;
   const selected = useMemo(
     () => (value && options.includes(value) ? value : options[0]),
     [options, value]
-  );
-  const selectedIndex = useMemo(
-    () => Math.max(0, options.indexOf(selected)),
-    [options, selected]
   );
   const cyclic = useMemo(
     () =>
@@ -45,14 +43,46 @@ export default function UIWheelSelectField({
 
   useEffect(() => {
     if (!open) return;
+    setDraftValue(selected);
+  }, [open, selected]);
+
+  useEffect(() => {
+    if (!open) return;
     const centerBlock = Math.floor(repeat / 2);
+    const draftIndex = Math.max(0, options.indexOf(draftValue || selected));
     setTimeout(() => {
       wheelRef.current?.scrollTo({
-        y: (centerBlock * options.length + selectedIndex) * itemHeight,
+        y: (centerBlock * options.length + draftIndex) * itemHeight,
         animated: false,
       });
     }, 0);
-  }, [itemHeight, open, options.length, selectedIndex]);
+  }, [draftValue, itemHeight, open, options, options.length, selected]);
+
+  if (Platform.OS === "web") {
+    const nextValue = value && options.includes(value) ? value : options[0] ?? "";
+    return (
+      <View style={styles.field}>
+        <View style={styles.webSelectWrap}>
+          <select
+            value={nextValue}
+            onChange={(e) => onChange(e.currentTarget.value)}
+            style={styles.webSelect as any}
+          >
+            {options.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+          <MaterialCommunityIcons
+            name={icon as any}
+            size={18}
+            color={colors.textSecondary}
+          />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View>
@@ -80,7 +110,7 @@ export default function UIWheelSelectField({
                 onMomentumScrollEnd={(e) => {
                   const rawIndex = Math.round(e.nativeEvent.contentOffset.y / itemHeight);
                   const normalized = ((rawIndex % options.length) + options.length) % options.length;
-                  onChange(options[normalized]);
+                  setDraftValue(options[normalized]);
                   if (
                     rawIndex < options.length ||
                     rawIndex > options.length * (repeat - 1)
@@ -99,13 +129,13 @@ export default function UIWheelSelectField({
                   </View>
                 ))}
               </ScrollView>
-              <View pointerEvents="none" style={styles.rowSelected} />
+              <View style={[styles.rowSelected, { pointerEvents: "none" }]} />
             </View>
 
             <Pressable
               style={styles.done}
               onPress={() => {
-                onChange(selected);
+                onChange(draftValue || selected);
                 setOpen(false);
               }}
             >
@@ -193,5 +223,22 @@ const styles = StyleSheet.create({
   doneText: {
     color: colors.background,
     fontWeight: "600",
+  },
+  webSelect: {
+    borderWidth: 0,
+    outlineWidth: 0,
+    flex: 1,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    backgroundColor: "transparent",
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  webSelectWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
 });

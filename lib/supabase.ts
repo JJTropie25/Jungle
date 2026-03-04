@@ -12,7 +12,8 @@ const canUseDOM =
   typeof window !== "undefined" && typeof document !== "undefined";
 const hasLocalStorage =
   canUseDOM && typeof window.localStorage !== "undefined";
-const isReactNative = !canUseDOM;
+const isReactNative =
+  typeof navigator !== "undefined" && navigator.product === "ReactNative";
 
 const memoryStorage = (() => {
   const store = new Map<string, string>();

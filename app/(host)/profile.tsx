@@ -1,24 +1,23 @@
-import { View, Text, StyleSheet, Image, Pressable } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useI18n } from "../../lib/i18n";
-import { supabase } from "../../lib/supabase";
-import { useAuthState } from "../../lib/auth";
-import { useCallback, useState } from "react";
 import { colors } from "../../lib/theme";
+import { useAuthState } from "../../lib/auth";
 import { useAppDialog } from "../../components/AppDialogProvider";
+import { supabase } from "../../lib/supabase";
 import TabTopNotch from "../../components/TabTopNotch";
+import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { resolveHostForUser } from "../../lib/host";
 
-export default function Profile() {
+export default function HostProfile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const dialog = useAppDialog();
   const { user } = useAuthState();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [hasHostMode, setHasHostMode] = useState(false);
+
   const handleLogout = async () => {
     if (!supabase) {
       await dialog.alert(
@@ -32,7 +31,7 @@ export default function Profile() {
       await dialog.alert(t("profile.logout"), error.message);
       return;
     }
-    await dialog.alert(t("profile.logout"), t("profile.logoutSuccess"));
+    router.replace("/(tabs)/guest");
   };
 
   useFocusEffect(
@@ -40,15 +39,10 @@ export default function Profile() {
       let isMounted = true;
       if (!supabase || !user) {
         setAvatarUrl(null);
-        setHasHostMode(false);
         return () => {
           isMounted = false;
         };
       }
-      resolveHostForUser(user.id).then(({ host }) => {
-        if (!isMounted) return;
-        setHasHostMode(Boolean(host));
-      });
       supabase
         .from("profiles")
         .select("avatar_url")
@@ -63,6 +57,7 @@ export default function Profile() {
       };
     }, [user])
   );
+
   return (
     <SafeAreaView style={styles.screen}>
       <TabTopNotch />
@@ -82,55 +77,27 @@ export default function Profile() {
               : "@guest"}
           </Text>
         </View>
-
         <View style={styles.actions}>
-          {user ? (
-            <>
-              <Pressable
-                style={styles.switchButton}
-                onPress={async () => {
-                  if (!hasHostMode) {
-                    await dialog.alert(t("edit.switchHostMode"), t("host.notAvailable"));
-                    return;
-                  }
-                  router.replace("/(host)/listings");
-                }}
-              >
-                <Text style={styles.switchButtonText}>{t("edit.switchHostMode")}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() =>
-                  router.push({
-                    pathname: "/(tabs)/profile/Edit",
-                    params: { returnTo: "guest" },
-                  })
-                }
-              >
-                <Text style={styles.secondaryButtonText}>{t("profile.editInfo")}</Text>
-              </Pressable>
-            </>
-          ) : (
-            <Pressable
-              style={styles.logoutButton}
-              onPress={() => router.push("/(auth)/sign-in")}
-            >
-              <Text style={styles.logoutButtonText}>{t("auth.signInAction")}</Text>
-            </Pressable>
-          )}
+          <Pressable style={styles.primaryButton} onPress={() => router.replace("/(tabs)/guest")}>
+            <Text style={styles.primaryButtonText}>{t("host.profile.switchGuest")}</Text>
+          </Pressable>
           <Pressable
             style={styles.secondaryButton}
-            onPress={() => router.push("/(tabs)/profile/Language")}
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/profile/Edit",
+                params: { returnTo: "host" },
+              })
+            }
           >
-            <Text style={styles.secondaryButtonText}>
-              {t("profile.changeLanguage")}
-            </Text>
+            <Text style={styles.secondaryButtonText}>{t("profile.editInfo")}</Text>
           </Pressable>
-          {user ? (
-            <Pressable style={styles.logoutButton} onPress={handleLogout}>
-              <Text style={styles.logoutButtonText}>{t("profile.logout")}</Text>
-            </Pressable>
-          ) : null}
+          <Pressable style={styles.secondaryButton} onPress={() => router.push("/(tabs)/profile/Language")}>
+            <Text style={styles.secondaryButtonText}>{t("profile.changeLanguage")}</Text>
+          </Pressable>
+          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>{t("profile.logout")}</Text>
+          </Pressable>
         </View>
       </View>
     </SafeAreaView>
@@ -138,16 +105,8 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.screenBackground,
-  },
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "flex-start",
-    paddingHorizontal: 24,
-  },
+  screen: { flex: 1, backgroundColor: colors.screenBackground },
+  container: { flex: 1, alignItems: "center", justifyContent: "flex-start", paddingHorizontal: 24 },
   header: {
     alignItems: "center",
     marginBottom: 32,
@@ -169,16 +128,16 @@ const styles = StyleSheet.create({
     width: "100%",
     gap: 12,
   },
-  switchButton: {
+  primaryButton: {
     backgroundColor: colors.warmAccent,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
   },
-  switchButtonText: {
+  primaryButtonText: {
     color: colors.background,
-    fontSize: 16,
     fontWeight: "700",
+    fontSize: 16,
   },
   secondaryButton: {
     backgroundColor: colors.surfaceSoft,
@@ -188,8 +147,8 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: colors.textPrimary,
-    fontSize: 16,
     fontWeight: "600",
+    fontSize: 16,
   },
   logoutButton: {
     backgroundColor: colors.textPrimary,
@@ -199,7 +158,7 @@ const styles = StyleSheet.create({
   },
   logoutButtonText: {
     color: colors.background,
-    fontSize: 16,
     fontWeight: "700",
+    fontSize: 16,
   },
 });

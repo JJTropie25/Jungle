@@ -5,7 +5,7 @@ export default function GuestLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: "transparent" },
+        contentStyle: { backgroundColor: "#E2F2F2" },
       }}
     >
       <Stack.Screen name="index" />

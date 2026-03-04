@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,12 +25,6 @@ function formatDate(date: Date) {
   return `${y}-${m}-${d}`;
 }
 
-function formatTime(date: Date) {
-  const h = String(date.getHours()).padStart(2, "0");
-  const m = String(date.getMinutes()).padStart(2, "0");
-  return `${h}:${m}`;
-}
-
 export default function UIDateTimeField({
   placeholder,
   value,
@@ -38,8 +33,10 @@ export default function UIDateTimeField({
 }: Props) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => new Date());
+  const [draftTime, setDraftTime] = useState({ h: "00", m: "00" });
   const hourRef = useRef<ScrollView>(null);
   const minuteRef = useRef<ScrollView>(null);
+  const webInputRef = useRef<HTMLInputElement | null>(null);
   const wheelItemHeight = 52;
   const wheelRepeat = 5;
   const icon = mode === "date" ? "calendar-month" : "clock-outline";
@@ -83,8 +80,13 @@ export default function UIDateTimeField({
 
   useEffect(() => {
     if (!open || mode !== "time") return;
-    const hourIndex = hours.indexOf(selectedTime.h);
-    const minuteIndex = minutes.indexOf(selectedTime.m);
+    setDraftTime(selectedTime);
+  }, [mode, open, selectedTime]);
+
+  useEffect(() => {
+    if (!open || mode !== "time") return;
+    const hourIndex = hours.indexOf(draftTime.h);
+    const minuteIndex = minutes.indexOf(draftTime.m);
     const centerBlock = Math.floor(wheelRepeat / 2);
     setTimeout(() => {
       hourRef.current?.scrollTo({
@@ -96,7 +98,7 @@ export default function UIDateTimeField({
         animated: false,
       });
     }, 0);
-  }, [hours, minutes, mode, open, selectedTime.h, selectedTime.m]);
+  }, [draftTime.h, draftTime.m, hours, minutes, mode, open]);
 
   const monthLabel = useMemo(() => {
     const month = viewDate.toLocaleString("default", { month: "long" });
@@ -121,11 +123,45 @@ export default function UIDateTimeField({
     const last = new Date(year, month + 1, 0);
     const startWeekday = first.getDay();
     const daysInMonth = last.getDate();
-    const cells: Array<number | null> = [];
+    const cells: (number | null)[] = [];
     for (let i = 0; i < startWeekday; i += 1) cells.push(null);
     for (let day = 1; day <= daysInMonth; day += 1) cells.push(day);
     return cells;
   }, [viewDate]);
+
+  if (Platform.OS === "web") {
+    return (
+      <View>
+        <Pressable
+          style={styles.field}
+          onPress={() => {
+            const node = webInputRef.current;
+            if (!node) return;
+            const showPicker = (node as any).showPicker as (() => void) | undefined;
+            if (typeof showPicker === "function") {
+              (node as any).showPicker();
+            } else {
+              node.click();
+            }
+          }}
+        >
+          <Text style={styles.label}>{value || placeholder}</Text>
+          <MaterialCommunityIcons name={icon} size={18} color={colors.textSecondary} />
+        </Pressable>
+        <input
+          ref={webInputRef}
+          type={mode === "date" ? "date" : "time"}
+          step={mode === "time" ? 900 : undefined}
+          value={value || ""}
+          onChange={(e) => {
+            const next = e.currentTarget.value;
+            if (next) onChange(next);
+          }}
+          style={styles.webHiddenInput as any}
+        />
+      </View>
+    );
+  }
 
   return (
     <View>
@@ -259,7 +295,7 @@ export default function UIDateTimeField({
                           const rawIndex = Math.round(offsetY / wheelItemHeight);
                           const normalized =
                             ((rawIndex % hours.length) + hours.length) % hours.length;
-                          onChange(`${hours[normalized]}:${selectedTime.m}`);
+                          setDraftTime((prev) => ({ ...prev, h: hours[normalized] }));
                           if (
                             rawIndex < hours.length ||
                             rawIndex > hours.length * (wheelRepeat - 1)
@@ -281,7 +317,7 @@ export default function UIDateTimeField({
                           </View>
                         ))}
                       </ScrollView>
-                      <View pointerEvents="none" style={styles.timeCenterHighlight} />
+                      <View style={[styles.timeCenterHighlight, { pointerEvents: "none" }]} />
                     </View>
                     <Text style={styles.timeSeparator}>:</Text>
                     <View style={styles.timeWheelBox}>
@@ -298,7 +334,7 @@ export default function UIDateTimeField({
                           const rawIndex = Math.round(offsetY / wheelItemHeight);
                           const normalized =
                             ((rawIndex % minutes.length) + minutes.length) % minutes.length;
-                          onChange(`${selectedTime.h}:${minutes[normalized]}`);
+                          setDraftTime((prev) => ({ ...prev, m: minutes[normalized] }));
                           if (
                             rawIndex < minutes.length ||
                             rawIndex > minutes.length * (wheelRepeat - 1)
@@ -320,14 +356,14 @@ export default function UIDateTimeField({
                           </View>
                         ))}
                       </ScrollView>
-                      <View pointerEvents="none" style={styles.timeCenterHighlight} />
+                      <View style={[styles.timeCenterHighlight, { pointerEvents: "none" }]} />
                     </View>
                   </View>
                 </View>
                 <Pressable
                   style={styles.done}
                   onPress={() => {
-                    onChange(`${selectedTime.h}:${selectedTime.m}`);
+                    onChange(`${draftTime.h}:${draftTime.m}`);
                     setOpen(false);
                   }}
                 >
@@ -501,5 +537,12 @@ const styles = StyleSheet.create({
   doneText: {
     color: colors.background,
     fontWeight: "600",
+  },
+  webHiddenInput: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    opacity: 0,
+    pointerEvents: "none",
   },
 });

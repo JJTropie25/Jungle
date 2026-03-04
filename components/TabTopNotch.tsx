@@ -7,7 +7,7 @@ export default function TabTopNotch() {
 
   return (
     <View style={[styles.fixedNotch, { top: insets.top }]}>
-      <Image source={logo} style={styles.notchLogo} />
+      <Image source={logo} resizeMode="cover" style={styles.notchLogo} />
     </View>
   );
 }
@@ -32,7 +32,6 @@ const styles = StyleSheet.create({
   notchLogo: {
     width: 110,
     height: 30,
-    resizeMode: "cover",
     marginTop: -1,
     marginLeft: -4,
   },

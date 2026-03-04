@@ -2,8 +2,6 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text,
   avatar_url text,
-  phone_country_code text,
-  phone_number text,
   created_at timestamptz default now()
 );
 
@@ -45,8 +43,6 @@ create table if not exists public.hosts (
   id uuid primary key default gen_random_uuid(),
   guest_id uuid references public.profiles(id) on delete set null,
   display_name text,
-  phone_country_code text,
-  phone_number text,
   created_at timestamptz default now()
 );
 
@@ -89,9 +85,6 @@ alter table public.services
 
 alter table public.services
   add column if not exists description text;
-
-alter table public.services
-  alter column price_eur type numeric(10,2) using price_eur::numeric;
 
 do $$
 begin

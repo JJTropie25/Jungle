@@ -4,7 +4,7 @@ create table if not exists public.services (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   category text not null check (category in ('rest', 'shower', 'storage')),
-  price_eur numeric(10,2) not null,
+  price_eur integer not null,
   location text not null,
   city text,
   region text,

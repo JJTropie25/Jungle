@@ -4,8 +4,9 @@ import { View } from "react-native";
 import { useI18n } from "../../lib/i18n";
 import { colors } from "../../lib/theme";
 
-export default function TabsLayout() {
+export default function HostTabsLayout() {
   const { t } = useI18n();
+
   return (
     <Tabs
       screenOptions={{
@@ -18,25 +19,23 @@ export default function TabsLayout() {
         },
         tabBarActiveTintColor: colors.textPrimary,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarLabelStyle: {
-          fontWeight: "600",
-        },
+        tabBarLabelStyle: { fontWeight: "600" },
       }}
     >
       <Tabs.Screen
-        name="guest"
+        name="listings"
         options={{
-          title: t("tabs.home"),
+          title: t("host.tabs.listings"),
           tabBarIcon: ({ size, focused }) => (
             focused ? (
               <View>
                 <MaterialCommunityIcons
-                  name="home-variant"
+                  name="view-grid"
                   size={Math.max(22, size)}
                   color={colors.surfaceSoft}
                 />
                 <MaterialCommunityIcons
-                  name="home-outline"
+                  name="view-grid-outline"
                   size={Math.max(22, size)}
                   color={colors.textSecondary}
                   style={{ position: "absolute", top: 0, left: 0 }}
@@ -44,7 +43,7 @@ export default function TabsLayout() {
               </View>
             ) : (
               <MaterialCommunityIcons
-                name="home-outline"
+                name="view-grid-outline"
                 size={Math.max(22, size)}
                 color={colors.textSecondary}
               />
@@ -53,19 +52,19 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="favorites"
+        name="reservations"
         options={{
-          title: t("tabs.favourites"),
+          title: t("host.tabs.reservations"),
           tabBarIcon: ({ size, focused }) => (
             focused ? (
               <View>
                 <MaterialCommunityIcons
-                  name="star"
+                  name="calendar-check"
                   size={Math.max(22, size)}
                   color={colors.surfaceSoft}
                 />
                 <MaterialCommunityIcons
-                  name="star-outline"
+                  name="calendar-check-outline"
                   size={Math.max(22, size)}
                   color={colors.textSecondary}
                   style={{ position: "absolute", top: 0, left: 0 }}
@@ -73,36 +72,7 @@ export default function TabsLayout() {
               </View>
             ) : (
               <MaterialCommunityIcons
-                name="star-outline"
-                size={Math.max(22, size)}
-                color={colors.textSecondary}
-              />
-            )
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="bookings"
-        options={{
-          title: t("tabs.bookings"),
-          tabBarIcon: ({ size, focused }) => (
-            focused ? (
-              <View>
-                <MaterialCommunityIcons
-                  name="briefcase"
-                  size={Math.max(22, size)}
-                  color={colors.surfaceSoft}
-                />
-                <MaterialCommunityIcons
-                  name="briefcase-outline"
-                  size={Math.max(22, size)}
-                  color={colors.textSecondary}
-                  style={{ position: "absolute", top: 0, left: 0 }}
-                />
-              </View>
-            ) : (
-              <MaterialCommunityIcons
-                name="briefcase-outline"
+                name="calendar-check-outline"
                 size={Math.max(22, size)}
                 color={colors.textSecondary}
               />
@@ -140,19 +110,38 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile/Edit"
+        name="edit-listing"
         options={{
           href: null,
           tabBarStyle: { display: "none" },
-          headerShown: false,
         }}
       />
       <Tabs.Screen
-        name="profile/Language"
+        name="new-listing"
         options={{
           href: null,
           tabBarStyle: { display: "none" },
-          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="reservation/[bookingId]"
+        options={{
+          href: null,
+          tabBarStyle: { display: "none" },
+        }}
+      />
+      <Tabs.Screen
+        name="check-in-confirmed"
+        options={{
+          href: null,
+          tabBarStyle: { display: "none" },
+        }}
+      />
+      <Tabs.Screen
+        name="scan-qr"
+        options={{
+          href: null,
+          tabBarStyle: { display: "none" },
         }}
       />
     </Tabs>

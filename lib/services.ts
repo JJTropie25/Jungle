@@ -4,6 +4,7 @@ export type Service = {
   id: string;
   title: string;
   category: "rest" | "shower" | "storage";
+  description?: string | null;
   price_eur: number;
   image_url?: string | null;
   location: string;

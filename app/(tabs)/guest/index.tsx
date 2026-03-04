@@ -7,7 +7,7 @@ import {
   TextInput,
   FlatList,
 } from "react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -30,6 +30,7 @@ import { useAuthState } from "../../../lib/auth";
 import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favorites";
 import { getRecentlyViewedIds } from "../../../lib/recentlyViewed";
 import { acceptPolicy, hasAcceptedPolicy } from "../../../lib/policy";
+import { PlaceSuggestion, searchPlaceSuggestions } from "../../../lib/geocoding";
 
 export default function GuestHome() {
   const router = useRouter();
@@ -44,6 +45,13 @@ export default function GuestHome() {
   const [microservice, setMicroservice] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [destinationCoords, setDestinationCoords] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [locationSuggestions, setLocationSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [searchingDestination, setSearchingDestination] = useState(false);
   const placeholderImage = require("../../../assets/images/react-logo.png");
   const [services, setServices] = useState<Service[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
@@ -51,6 +59,7 @@ export default function GuestHome() {
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [showPolicyBanner, setShowPolicyBanner] = useState(false);
+  const suggestReqSeq = useRef(0);
   const categories = [
     { label: t("category.rest"), icon: "bed-king" },
     { label: t("category.shower"), icon: "shower" },
@@ -186,17 +195,40 @@ export default function GuestHome() {
       )
       .slice(0, 10);
   }, [services, userCoords]);
-  const locationSuggestions = useMemo(() => {
-    const needle = destination.trim().toLowerCase();
-    if (!needle) return [];
-    const unique = new Map<string, string>();
-    for (const service of services) {
-      if (service.location.toLowerCase().includes(needle)) {
-        unique.set(service.location, service.location);
-      }
+  useEffect(() => {
+    const query = destination.trim();
+    if (!showSuggestions || query.length < 3) {
+      setLocationSuggestions([]);
+      setLoadingSuggestions(false);
+      return;
     }
-    return Array.from(unique.values()).slice(0, 6);
-  }, [destination, services]);
+
+    const controller = new AbortController();
+    const reqId = ++suggestReqSeq.current;
+    const timer = setTimeout(async () => {
+      try {
+        setLoadingSuggestions(true);
+        const results = await searchPlaceSuggestions(query, 6);
+        if (controller.signal.aborted) return;
+        if (reqId === suggestReqSeq.current) {
+          setLocationSuggestions(results);
+        }
+      } catch (error: any) {
+        if (error?.name !== "AbortError" && reqId === suggestReqSeq.current) {
+          setLocationSuggestions([]);
+        }
+      } finally {
+        if (reqId === suggestReqSeq.current) {
+          setLoadingSuggestions(false);
+        }
+      }
+    }, 280);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [destination, showSuggestions]);
   const isSearchEnabled =
     Boolean(selectedCategory ?? microservice) &&
     destination.trim().length > 0 &&
@@ -279,6 +311,7 @@ export default function GuestHome() {
                 value={destination}
                 onChangeText={(text) => {
                   setDestination(text);
+                  setDestinationCoords(null);
                   setShowSuggestions(true);
                 }}
                 onFocus={() => {
@@ -287,18 +320,25 @@ export default function GuestHome() {
                 }}
               />
             </View>
+            {showSuggestions && loadingSuggestions ? (
+              <Text style={styles.dropdownLoading}>Searching...</Text>
+            ) : null}
             {showSuggestions && locationSuggestions.length > 0 && (
               <View style={styles.dropdown}>
                 {locationSuggestions.map((item) => (
                   <TouchableOpacity
-                    key={item}
+                    key={`${item.label}:${item.latitude}:${item.longitude}`}
                     style={styles.dropdownItem}
                     onPress={() => {
-                      setDestination(item);
+                      setDestination(item.label);
+                      setDestinationCoords({
+                        latitude: item.latitude,
+                        longitude: item.longitude,
+                      });
                       setShowSuggestions(false);
                     }}
                   >
-                    <Text>{item}</Text>
+                    <Text>{item.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -333,23 +373,39 @@ export default function GuestHome() {
               <TouchableOpacity
                 style={[
                   styles.searchButton,
-                  !isSearchEnabled && styles.searchButtonDisabled,
+                  (!isSearchEnabled || searchingDestination) && styles.searchButtonDisabled,
                 ]}
-                onPress={() => {
+                onPress={async () => {
                   closeDropdowns();
+                  let coords = destinationCoords;
+                  if (!coords && destination.trim().length >= 3) {
+                    setSearchingDestination(true);
+                    const suggestions = await searchPlaceSuggestions(destination, 1);
+                    setSearchingDestination(false);
+                    if (suggestions.length > 0) {
+                      coords = {
+                        latitude: suggestions[0].latitude,
+                        longitude: suggestions[0].longitude,
+                      };
+                    }
+                  }
                   router.push({
                     pathname: "/(tabs)/guest/SearchResults",
                     params: {
                       destination,
+                      destinationLat: coords ? String(coords.latitude) : "",
+                      destinationLon: coords ? String(coords.longitude) : "",
                       timeslot: date && time ? `${date} ${time}` : "",
                       people,
                       microservice: selectedCategory ?? microservice,
                     },
                   });
                 }}
-                disabled={!isSearchEnabled}
+                disabled={!isSearchEnabled || searchingDestination}
               >
-                <Text style={styles.searchButtonText}>{t("home.search")}</Text>
+                <Text style={styles.searchButtonText}>
+                  {searchingDestination ? "Searching..." : t("home.search")}
+                </Text>
               </TouchableOpacity>
           </View>
         </View>
@@ -596,6 +652,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceSoft,
     overflow: "hidden",
+  },
+  dropdownLoading: {
+    marginTop: 6,
+    marginBottom: 2,
+    color: colors.textSecondary,
+    fontSize: 12,
   },
   dropdownItem: {
     paddingVertical: 10,

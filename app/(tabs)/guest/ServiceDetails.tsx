@@ -39,6 +39,7 @@ export default function ServiceDetails() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [serviceTitle, setServiceTitle] = useState<string | null>(null);
   const [serviceLocation, setServiceLocation] = useState<string | null>(null);
+  const [serviceDescription, setServiceDescription] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const reviews = useMemo(
     () => [
@@ -108,7 +109,7 @@ export default function ServiceDetails() {
     if (!serviceId || !supabase) return;
     supabase
       .from("services")
-      .select("title, location, image_url")
+      .select("title, location, image_url, description")
       .eq("id", serviceId)
       .single()
       .then(({ data }) => {
@@ -116,6 +117,7 @@ export default function ServiceDetails() {
         setImageUrl(data?.image_url ?? null);
         setServiceTitle(data?.title ?? null);
         setServiceLocation(data?.location ?? null);
+        setServiceDescription(data?.description ?? null);
       });
     return () => {
       isMounted = false;
@@ -244,7 +246,7 @@ export default function ServiceDetails() {
 
         <View style={styles.imageMock}>
           {imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.imageFill} />
+            <Image source={{ uri: imageUrl }} resizeMode="cover" style={styles.imageFill} />
           ) : (
             <Text>IMAGE</Text>
           )}
@@ -253,8 +255,8 @@ export default function ServiceDetails() {
         <Text style={styles.sectionTitle}>Description</Text>
         <View style={styles.infoCard}>
           <Text style={styles.infoText}>
-            {microservice ?? "This service"} near {destination ?? "your destination"} is designed
-            for fast, reliable access with clear check-in flow, secure space, and flexible timing.
+            {serviceDescription ??
+              `${summaryTitle} near ${summaryLocation} is designed for fast, reliable access with clear check-in flow, secure space, and flexible timing.`}
           </Text>
         </View>
 
@@ -386,7 +388,6 @@ const styles = StyleSheet.create({
   imageFill: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
   sectionTitle: {
     fontSize: 20,
