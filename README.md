@@ -48,3 +48,13 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Local setup (secrets)
+
+Create a local `.env` from `.env.example` and fill in keys.
+
+For Android FCM (push notifications), download `google-services.json` from Firebase Console:
+Project settings -> Your apps -> Android -> Download config.
+Place it at the project root as `google-services.json`.
+
+These files are intentionally git-ignored.

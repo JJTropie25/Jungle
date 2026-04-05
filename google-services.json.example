@@ -1,0 +1,4 @@
+# Local secrets are not committed.
+# Copy this file to .env and fill values.
+# google-services.json is required for Android FCM in dev builds.
+# Download it from Firebase Console (Project settings > Your apps > Android).
