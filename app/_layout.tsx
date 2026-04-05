@@ -4,38 +4,53 @@ import { useAuthState } from "../lib/auth";
 import { StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { AppDialogProvider } from "../components/AppDialogProvider";
+import { useFonts } from "expo-font";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import SplashScreen from "../components/SplashScreen";
+import NotificationsProvider from "../components/NotificationsProvider";
+import { StripeProvider } from "@stripe/stripe-react-native";
 
 export default function RootLayout() {
   useAuthState();
+  const [fontsLoaded] = useFonts({
+    ...MaterialCommunityIcons.font,
+  });
+  const stripePublishableKey =
+    process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
+
+  if (!fontsLoaded) return <SplashScreen />;
 
   return (
-    <I18nProvider>
-      <AppDialogProvider>
-        <View style={styles.root}>
-          <LinearGradient
-            colors={["#166A6A", "#A5D3D3", "#E2F2F2"]}
-            locations={[0, 0.45, 1]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
+    <StripeProvider publishableKey={stripePublishableKey} merchantIdentifier="merchant.com.lagoon">
+      <I18nProvider>
+        <AppDialogProvider>
+          <NotificationsProvider />
+          <View style={styles.root}>
+            <LinearGradient
+              colors={["#0B3F3F", "#0B3F3F", "#0B3F3F"]}
+              locations={[0, 0.45, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
 
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#E2F2F2" } }} />
-          <LinearGradient
-            colors={[
-              "rgba(15,78,78,0.32)",
-              "rgba(22,106,106,0.16)",
-              "rgba(226,242,242,0.02)",
-            ]}
-            locations={[0, 0.35, 1]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
-          />
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0B3F3F" } }} />
+            <LinearGradient
+              colors={[
+                "rgba(11,63,63,0)",
+                "rgba(11,63,63,0)",
+                "rgba(11,63,63,0)",
+              ]}
+              locations={[0, 0.35, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
+            />
 
-        </View>
-      </AppDialogProvider>
-    </I18nProvider>
+          </View>
+        </AppDialogProvider>
+      </I18nProvider>
+    </StripeProvider>
   );
 }
 

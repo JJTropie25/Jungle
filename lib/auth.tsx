@@ -20,18 +20,18 @@ export function useAuthState(): AuthState {
       return;
     }
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!isMounted) return;
-        setSession(data.session ?? null);
-        setUser(data.session?.user ?? null);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setLoading(false);
-      });
+    const hydrateSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!isMounted) return;
+      setSession(data.session ?? null);
+      setUser(data.session?.user ?? null);
+      setLoading(false);
+    };
+
+    hydrateSession().catch(() => {
+      if (!isMounted) return;
+      setLoading(false);
+    });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, nextSession) => {

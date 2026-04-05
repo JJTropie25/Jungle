@@ -6,6 +6,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera/build";
 import { colors } from "../../lib/theme";
 import { useAppDialog } from "../../components/AppDialogProvider";
+import { supabase } from "../../lib/supabase";
 
 export default function HostScanQr() {
   const router = useRouter();
@@ -58,6 +59,12 @@ export default function HostScanQr() {
                   await dialog.alert("Scan QR", "Invalid QR token.");
                   setScanLocked(false);
                   return;
+                }
+                if (supabase && bookingId) {
+                  await supabase
+                    .from("bookings")
+                    .update({ checked_in_at: new Date().toISOString() })
+                    .eq("id", bookingId);
                 }
                 router.replace({
                   pathname: "/(host)/check-in-confirmed",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,12 @@ import { supabase } from "../../lib/supabase";
 import { useI18n } from "../../lib/i18n";
 import { colors } from "../../lib/theme";
 import { useAppDialog } from "../../components/AppDialogProvider";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
+import Constants from "expo-constants";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignUp() {
   const router = useRouter();
@@ -26,7 +32,30 @@ const [password, setPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [prefixOpen, setPrefixOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | null>(null);
   const PREFIX_OPTIONS = ["+39", "+33", "+34", "+44", "+49", "+1"];
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        router.replace("/(tabs)/guest");
+      }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session) {
+          router.replace("/(tabs)/guest");
+        }
+      }
+    );
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, [router]);
 
   const handleSignUp = async () => {
     if (!supabase) {
@@ -78,15 +107,142 @@ const [password, setPassword] = useState("");
     router.replace("/(auth)/sign-in");
   };
 
+  const handleOAuth = async (provider: "google" | "facebook") => {
+    if (!supabase) {
+      await dialog.alert(
+        t("auth.signUpTitle"),
+        "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      return;
+    }
+    try {
+      setOauthLoading(provider);
+      const hostUri =
+        Constants.expoConfig?.hostUri ||
+        (Constants.manifest as any)?.hostUri ||
+        (Constants.manifest as any)?.debuggerHost;
+      const isExpoGo = Constants.appOwnership === "expo";
+      let redirectTo = Linking.createURL("/auth-callback");
+      if (isExpoGo) {
+        if (
+          redirectTo.startsWith("http") ||
+          redirectTo.includes("localhost") ||
+          redirectTo.includes("127.0.0.1")
+        ) {
+          if (!hostUri) {
+            await dialog.alert(
+              t("auth.signUpTitle"),
+              "Missing Expo host URI. Reopen Expo Go and try again."
+            );
+            return;
+          }
+          redirectTo = `exp://${hostUri}/--/auth-callback`;
+        } else if (!redirectTo.includes("/--/")) {
+          const [scheme, rest] = redirectTo.split("://");
+          const host = rest?.split("/")[0];
+          if (scheme && host) {
+            redirectTo = `${scheme}://${host}/--/auth-callback`;
+          }
+        }
+      }
+      console.log("OAuth redirectTo", redirectTo);
+      if (Platform.OS === "web") {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: { redirectTo },
+        });
+        if (error) {
+          await dialog.alert(t("auth.signUpTitle"), error.message);
+        }
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
+      if (error) {
+        await dialog.alert(t("auth.signUpTitle"), error.message);
+        return;
+      }
+      if (!data?.url) {
+        await dialog.alert(t("auth.signUpTitle"), "Missing OAuth URL.");
+        return;
+      }
+
+      console.log("OAuth authUrl", data.url);
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      console.log("OAuth result", result);
+      if (result.type !== "success" || !result.url) return;
+
+      const parsed = Linking.parse(result.url);
+      const code =
+        typeof parsed.queryParams?.code === "string"
+          ? parsed.queryParams.code
+          : undefined;
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(
+          code
+        );
+        if (exchangeError) {
+          await dialog.alert(t("auth.signUpTitle"), exchangeError.message);
+          return;
+        }
+        router.replace("/(tabs)/guest");
+        return;
+      }
+
+      const hash = result.url.split("#")[1] ?? "";
+      const hashParams = new URLSearchParams(hash);
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      if (accessToken && refreshToken) {
+        const { error: setError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (setError) {
+          await dialog.alert(t("auth.signUpTitle"), setError.message);
+          return;
+        }
+        router.replace("/(tabs)/guest");
+      }
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{t("auth.signUpTitle")}</Text>
       <Text style={styles.subtitle}>{t("auth.signUpSubtitle")}</Text>
 
+      <View style={styles.socialRow}>
+        <Pressable
+          style={[styles.socialButton, oauthLoading === "google" && styles.disabled]}
+          onPress={() => handleOAuth("google")}
+          disabled={oauthLoading === "google"}
+        >
+          <MaterialCommunityIcons name="google" size={18} color={colors.textPrimary} />
+          <Text style={styles.socialText}>{t("auth.continueWithGoogle")}</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.socialButton, oauthLoading === "facebook" && styles.disabled]}
+          onPress={() => handleOAuth("facebook")}
+          disabled={oauthLoading === "facebook"}
+        >
+          <MaterialCommunityIcons name="facebook" size={18} color={colors.textPrimary} />
+          <Text style={styles.socialText}>{t("auth.continueWithFacebook")}</Text>
+        </Pressable>
+      </View>
+
+      <Text style={styles.orText}>{t("auth.orContinue")}</Text>
+
       <View style={styles.form}>
         <TextInput
           style={styles.input}
-          placeholder="Username"
+          placeholder={t("auth.username")}
+          placeholderTextColor={colors.textMuted}
           autoCapitalize="none"
           value={username}
           onChangeText={setUsername}
@@ -94,6 +250,7 @@ const [password, setPassword] = useState("");
         <TextInput
           style={styles.input}
           placeholder={t("auth.email")}
+          placeholderTextColor={colors.textMuted}
           autoCapitalize="none"
           keyboardType="email-address"
           value={email}
@@ -102,6 +259,7 @@ const [password, setPassword] = useState("");
         <TextInput
           style={styles.input}
           placeholder={t("auth.password")}
+          placeholderTextColor={colors.textMuted}
           secureTextEntry
           value={password}
           onChangeText={setPassword}
@@ -114,6 +272,7 @@ const [password, setPassword] = useState("");
           <TextInput
             style={[styles.input, styles.phoneInput]}
             placeholder="3331234567"
+            placeholderTextColor={colors.textMuted}
             keyboardType="phone-pad"
             value={phoneNumber}
             onChangeText={(value) => setPhoneNumber(value.replace(/[^\d]/g, ""))}
@@ -167,30 +326,54 @@ const styles = StyleSheet.create({
     paddingTop: 80,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: colors.surface,
   },
   subtitle: {
     marginTop: 8,
-    fontSize: 15,
-    color: colors.textSecondary,
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.surface,
+  },
+  socialRow: {
+    marginTop: 20,
+    gap: 10,
+  },
+  socialButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: colors.surface,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+  },
+  socialText: {
+    color: colors.textPrimary,
+    fontWeight: "700",
+  },
+  orText: {
+    marginTop: 16,
+    color: colors.surface,
+    fontWeight: "600",
   },
   form: {
-    marginTop: 32,
+    marginTop: 20,
     gap: 12,
   },
   input: {
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "700",
   },
   phoneLabel: {
-    color: colors.textSecondary,
-    fontSize: 13,
+    color: colors.surface,
+    fontSize: 14,
     fontWeight: "600",
     marginTop: 2,
   },
@@ -200,24 +383,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   prefixButton: {
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: Platform.OS === "web" ? 13 : 12,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     width: 88,
     alignItems: "center",
   },
   prefixButtonText: {
     color: colors.textPrimary,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   phoneInput: {
     flex: 1,
   },
   primaryButton: {
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.warmAccent,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
@@ -226,7 +407,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: colors.background,
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   disabled: {
     opacity: 0.7,
@@ -238,11 +419,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   footerText: {
-    color: colors.textSecondary,
+    color: colors.surface,
   },
   link: {
-    color: colors.textPrimary,
-    fontWeight: "600",
+    color: colors.surface,
+    fontWeight: "700",
   },
   modalBackdrop: {
     flex: 1,
@@ -251,26 +432,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   modalCard: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
     gap: 8,
   },
   prefixItem: {
     paddingVertical: 10,
     paddingHorizontal: 10,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
   },
   prefixItemActive: {
     backgroundColor: colors.surfaceSoft,
   },
   prefixItemText: {
     color: colors.textPrimary,
-    fontWeight: "600",
+    fontWeight: "700",
   },
 });

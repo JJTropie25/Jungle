@@ -1,4 +1,8 @@
-const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN?.trim() ?? "";
+const googleMapsKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
+const googleGeocodingKey =
+  process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY?.trim() ?? googleMapsKey;
+const googlePlacesKey =
+  process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY?.trim() ?? googleGeocodingKey;
 
 export type PlaceSuggestion = {
   label: string;
@@ -6,119 +10,126 @@ export type PlaceSuggestion = {
   longitude: number;
 };
 
-function normalizeMapboxLabel(parts: Array<string | undefined>) {
-  return parts
-    .map((part) => part?.trim())
-    .filter((part): part is string => Boolean(part))
-    .join(", ");
-}
-
-async function mapboxSearch(query: string, limit: number): Promise<PlaceSuggestion[]> {
-  if (!mapboxToken) return [];
+async function googleGeocodeSearch(query: string, limit: number): Promise<PlaceSuggestion[]> {
+  if (!googleGeocodingKey) return [];
   const url =
-    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
-    `?access_token=${encodeURIComponent(mapboxToken)}` +
-    `&autocomplete=true&limit=${Math.max(1, Math.min(limit, 10))}` +
-    "&types=address,place,locality,neighborhood,poi";
+    `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}` +
+    `&key=${encodeURIComponent(googleGeocodingKey)}`;
   const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
   if (!res.ok) return [];
   const payload = (await res.json()) as {
-    features?: Array<{
-      place_name?: string;
-      text?: string;
-      center?: [number, number];
-      context?: Array<{ text?: string }>;
+    results?: Array<{
+      formatted_address?: string;
+      geometry?: { location?: { lat?: number; lng?: number } };
     }>;
+    status?: string;
   };
-  if (!Array.isArray(payload.features)) return [];
-  return payload.features
-    .map((feature) => {
-      const lon = feature.center?.[0];
-      const lat = feature.center?.[1];
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-      const contextCity = feature.context?.[0]?.text;
-      const label = feature.place_name?.trim() || normalizeMapboxLabel([feature.text, contextCity]);
-      if (!label) return null;
-      return { label, latitude: lat, longitude: lon } satisfies PlaceSuggestion;
-    })
-    .filter((item): item is PlaceSuggestion => Boolean(item));
-}
-
-async function nominatimSearch(query: string, limit: number): Promise<PlaceSuggestion[]> {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=${Math.max(
-    1,
-    Math.min(limit, 10)
-  )}&q=${encodeURIComponent(query)}`;
-  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
-  if (!res.ok) return [];
-  const payload = (await res.json()) as Array<{
-    display_name?: string;
-    lat?: string;
-    lon?: string;
-  }>;
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .map((item) => {
-      const latitude = Number(item.lat);
-      const longitude = Number(item.lon);
-      const label = item.display_name?.trim();
+  if (payload.status && payload.status !== "OK") return [];
+  if (!Array.isArray(payload.results)) return [];
+  return payload.results
+    .slice(0, Math.max(1, Math.min(limit, 10)))
+    .map((result) => {
+      const latitude = result.geometry?.location?.lat;
+      const longitude = result.geometry?.location?.lng;
+      const label = result.formatted_address?.trim();
       if (!label || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
       return { label, latitude, longitude } satisfies PlaceSuggestion;
     })
     .filter((item): item is PlaceSuggestion => Boolean(item));
 }
 
+async function googlePlacesAutocomplete(
+  query: string,
+  limit: number
+): Promise<PlaceSuggestion[]> {
+  if (!googlePlacesKey) return [];
+  const url =
+    `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+      query
+    )}` +
+    `&types=geocode&key=${encodeURIComponent(googlePlacesKey)}`;
+  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
+  if (!res.ok) return [];
+  const payload = (await res.json()) as {
+    status?: string;
+    predictions?: Array<{ description?: string; place_id?: string }>;
+  };
+  if (payload.status !== "OK" || !Array.isArray(payload.predictions)) return [];
+
+  const sliced = payload.predictions.slice(0, Math.max(1, Math.min(limit, 10)));
+  const details = await Promise.all(
+    sliced.map(async (prediction) => {
+      if (!prediction.place_id) return null;
+      const detailsUrl =
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
+          prediction.place_id
+        )}` +
+        `&fields=formatted_address,geometry&key=${encodeURIComponent(googlePlacesKey)}`;
+      const detailsRes = await fetch(detailsUrl, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+      if (!detailsRes.ok) return null;
+      const detailsPayload = (await detailsRes.json()) as {
+        status?: string;
+        result?: {
+          formatted_address?: string;
+          geometry?: { location?: { lat?: number; lng?: number } };
+        };
+      };
+      if (detailsPayload.status !== "OK") return null;
+      const label =
+        detailsPayload.result?.formatted_address?.trim() ??
+        prediction.description?.trim();
+      const latitude = detailsPayload.result?.geometry?.location?.lat;
+      const longitude = detailsPayload.result?.geometry?.location?.lng;
+      if (!label || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+      return { label, latitude, longitude } satisfies PlaceSuggestion;
+    })
+  );
+
+  return details.filter((item): item is PlaceSuggestion => Boolean(item));
+}
+
 export async function searchPlaceSuggestions(query: string, limit = 6): Promise<PlaceSuggestion[]> {
   const normalized = query.trim();
-  if (normalized.length < 3) return [];
+  if (normalized.length < 1) return [];
   try {
-    const mapboxResults = await mapboxSearch(normalized, limit);
-    if (mapboxResults.length > 0) return mapboxResults;
+    const results = await googlePlacesAutocomplete(normalized, limit);
+    if (results.length > 0) return results;
   } catch {
-    // Fall through to Nominatim.
+    // ignore
   }
   try {
-    return await nominatimSearch(normalized, limit);
+    const results = await googleGeocodeSearch(normalized, limit);
+    if (results.length > 0) return results;
   } catch {
-    return [];
+    // ignore
   }
+  return [];
 }
 
-async function mapboxReverse(latitude: number, longitude: number): Promise<string | null> {
-  if (!mapboxToken) return null;
+async function googleReverse(latitude: number, longitude: number): Promise<string | null> {
+  if (!googleGeocodingKey) return null;
   const url =
-    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-      String(longitude)
-    )},${encodeURIComponent(String(latitude))}.json` +
-    `?access_token=${encodeURIComponent(mapboxToken)}&limit=1`;
+    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(
+      String(latitude)
+    )},${encodeURIComponent(String(longitude))}` +
+    `&key=${encodeURIComponent(googleGeocodingKey)}`;
   const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
   if (!res.ok) return null;
-  const payload = (await res.json()) as { features?: Array<{ place_name?: string }> };
-  return payload.features?.[0]?.place_name?.trim() || null;
-}
-
-async function nominatimReverse(latitude: number, longitude: number): Promise<string | null> {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
-    String(latitude)
-  )}&lon=${encodeURIComponent(String(longitude))}`;
-  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
-  if (!res.ok) return null;
-  const payload = (await res.json()) as { display_name?: string };
-  return payload.display_name?.trim() || null;
+  const payload = (await res.json()) as {
+    results?: Array<{ formatted_address?: string }>;
+  };
+  return payload.results?.[0]?.formatted_address?.trim() || null;
 }
 
 export async function reverseGeocodeLabel(latitude: number, longitude: number): Promise<string> {
   try {
-    const mapboxLabel = await mapboxReverse(latitude, longitude);
-    if (mapboxLabel) return mapboxLabel;
+    const label = await googleReverse(latitude, longitude);
+    if (label) return label;
   } catch {
-    // Fall through to Nominatim.
-  }
-  try {
-    const nominatimLabel = await nominatimReverse(latitude, longitude);
-    if (nominatimLabel) return nominatimLabel;
-  } catch {
-    // Ignore and return coords.
+    // ignore
   }
   return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 }

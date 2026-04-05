@@ -9,7 +9,7 @@ import { colors } from "../../lib/theme";
 import { useAppDialog } from "../../components/AppDialogProvider";
 import TabTopNotch from "../../components/TabTopNotch";
 import { useFocusEffect } from "@react-navigation/native";
-import { resolveHostForUser } from "../../lib/host";
+import { ensureHostForUser, resolveHostForUser } from "../../lib/host";
 
 export default function Profile() {
   const router = useRouter();
@@ -89,9 +89,16 @@ export default function Profile() {
               <Pressable
                 style={styles.switchButton}
                 onPress={async () => {
+                  if (!user) return;
                   if (!hasHostMode) {
-                    await dialog.alert(t("edit.switchHostMode"), t("host.notAvailable"));
-                    return;
+                    const displayName =
+                      user.user_metadata?.username ?? user.email ?? "Host";
+                    const { error } = await ensureHostForUser(user.id, displayName);
+                    if (error) {
+                      await dialog.alert(t("edit.switchHostMode"), error);
+                      return;
+                    }
+                    setHasHostMode(true);
                   }
                   router.replace("/(host)/listings");
                 }}
@@ -163,7 +170,7 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 18,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: colors.surface,
   },
   actions: {
     width: "100%",

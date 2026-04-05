@@ -17,6 +17,8 @@ type ServiceCardProps = {
   location: string;
   imageSource: ImageSourcePropType;
   meta?: string;
+  categoryIconName?: string;
+  distanceLabel?: string;
   rating?: number | null;
   fullWidth?: boolean;
   horizontal?: boolean;
@@ -33,6 +35,8 @@ export default function ServiceCard({
   location,
   imageSource,
   meta,
+  categoryIconName,
+  distanceLabel,
   rating,
   fullWidth,
   horizontal,
@@ -51,6 +55,7 @@ export default function ServiceCard({
     typeof rating === "number" && Number.isFinite(rating)
       ? `${rating.toFixed(1)}/10`
       : null;
+  const hasIconRow = Boolean(categoryIconName || distanceLabel);
 
   return (
     <Container
@@ -70,6 +75,7 @@ export default function ServiceCard({
             horizontal && styles.imageHorizontal,
             imageStyle,
           ]}
+          resizeMode="cover"
         />
         {onToggleFavorite && (
           <Pressable style={styles.favoriteButton} onPress={onToggleFavorite}>
@@ -83,12 +89,37 @@ export default function ServiceCard({
       </View>
       <View style={styles.content}>
         <Text style={styles.title}>{title}</Text>
-        {ratingLabel ? (
-          <View style={styles.ratingBadge}>
-            <Text style={styles.ratingText}>{ratingLabel}</Text>
+        {hasIconRow ? (
+          <View style={styles.infoRow}>
+            <View style={styles.infoLeft}>
+              {categoryIconName ? (
+                <MaterialCommunityIcons
+                  name={categoryIconName as any}
+                  size={14}
+                  color={colors.textSecondary}
+                  style={styles.infoIcon}
+                />
+              ) : null}
+            </View>
+            {ratingLabel ? (
+              <View style={[styles.ratingBadge, styles.ratingBadgeInline]}>
+                <Text style={styles.ratingText}>{ratingLabel}</Text>
+              </View>
+            ) : null}
           </View>
+        ) : (
+          <>
+            {ratingLabel ? (
+              <View style={styles.ratingBadge}>
+                <Text style={styles.ratingText}>{ratingLabel}</Text>
+              </View>
+            ) : null}
+            {meta ? <Text style={styles.meta}>{meta}</Text> : null}
+          </>
+        )}
+        {hasIconRow && distanceLabel ? (
+          <Text style={styles.distanceText}>{distanceLabel}</Text>
         ) : null}
-        {meta ? <Text style={styles.meta}>{meta}</Text> : null}
         <Text style={styles.location}>{location}</Text>
       </View>
       <View style={styles.priceCorner}>
@@ -107,8 +138,6 @@ const styles = StyleSheet.create({
     marginRight: 12,
     padding: 10,
     overflow: "visible",
-    borderWidth: 1,
-    borderColor: "rgba(111,182,154,0.55)",
     shadowColor: "#000",
     shadowOpacity: 0.24,
     shadowRadius: 4,
@@ -121,7 +150,7 @@ const styles = StyleSheet.create({
   },
   cardHorizontal: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "stretch",
     gap: 12,
   },
   imageWrap: {
@@ -131,6 +160,7 @@ const styles = StyleSheet.create({
   imageWrapHorizontal: {
     width: 110,
     flexShrink: 0,
+    alignSelf: "stretch",
   },
   image: {
     width: "100%",
@@ -141,7 +171,8 @@ const styles = StyleSheet.create({
   },
   imageHorizontal: {
     width: "100%",
-    height: 90,
+    flex: 1,
+    height: undefined,
     marginBottom: 0,
   },
   favoriteButton: {
@@ -172,6 +203,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
+  ratingBadgeInline: {
+    marginTop: 0,
+    alignSelf: "center",
+  },
   ratingText: {
     color: colors.background,
     fontSize: 11,
@@ -182,6 +217,26 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  infoLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  infoIcon: {
+    marginTop: 1,
+  },
+  distanceText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
+    fontWeight: "600",
+  },
   priceCorner: {
     position: "absolute",
     right: 0,
@@ -191,9 +246,6 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 9,
     paddingVertical: 5,
     paddingHorizontal: 10,
-    borderLeftWidth: 1,
-    borderTopWidth: 1,
-    borderColor: "rgba(111,182,154,0.8)",
   },
   price: {
     fontSize: 15,

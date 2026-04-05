@@ -9,6 +9,15 @@ export default function Language() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { language, setLanguage, t } = useI18n();
+  const options = [
+    { code: "en", label: t("language.english"), flag: "🇬🇧" },
+    { code: "it", label: t("language.italian"), flag: "🇮🇹" },
+    { code: "es", label: t("language.spanish"), flag: "🇪🇸" },
+    { code: "zh", label: t("language.chinese"), flag: "🇨🇳" },
+    { code: "de", label: t("language.german"), flag: "🇩🇪" },
+    { code: "fr", label: t("language.french"), flag: "🇫🇷" },
+    { code: "ja", label: t("language.japanese"), flag: "🇯🇵" },
+  ] as const;
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -23,73 +32,33 @@ export default function Language() {
         <Text style={styles.title}>{t("language.title")}</Text>
 
         <View style={styles.options}>
-          <TouchableOpacity
-            style={[
-              styles.option,
-              language === "en" && styles.optionSelected,
-            ]}
-            onPress={() => setLanguage("en")}
-          >
-            <Text
+          {options.map((option) => (
+            <TouchableOpacity
+              key={option.code}
               style={[
-                styles.optionText,
-                language === "en" && styles.optionTextSelected,
+                styles.option,
+                language === option.code && styles.optionSelected,
               ]}
+              onPress={() => setLanguage(option.code)}
             >
-              {t("language.english")}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.option,
-              language === "it" && styles.optionSelected,
-            ]}
-            onPress={() => setLanguage("it")}
-          >
-            <Text
-              style={[
-                styles.optionText,
-                language === "it" && styles.optionTextSelected,
-              ]}
-            >
-              {t("language.italian")}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.option,
-              language === "es" && styles.optionSelected,
-            ]}
-            onPress={() => setLanguage("es")}
-          >
-            <Text
-              style={[
-                styles.optionText,
-                language === "es" && styles.optionTextSelected,
-              ]}
-            >
-              {t("language.spanish")}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.option,
-              language === "zh" && styles.optionSelected,
-            ]}
-            onPress={() => setLanguage("zh")}
-          >
-            <Text
-              style={[
-                styles.optionText,
-                language === "zh" && styles.optionTextSelected,
-              ]}
-            >
-              {t("language.chinese")}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.optionText,
+                  language === option.code && styles.optionTextSelected,
+                ]}
+              >
+                {option.label}
+              </Text>
+              <Text
+                style={[
+                  styles.optionFlag,
+                  language === option.code && styles.optionFlagSelected,
+                ]}
+              >
+                {option.flag}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
     </SafeAreaView>
@@ -113,7 +82,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: colors.surface,
     marginBottom: 16,
   },
   options: {
@@ -121,8 +90,11 @@ const styles = StyleSheet.create({
   },
   option: {
     paddingVertical: 14,
+    paddingHorizontal: 14,
     borderRadius: 10,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: colors.surfaceSoft,
   },
   optionSelected: {
@@ -133,6 +105,12 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   optionTextSelected: {
+    color: colors.background,
+  },
+  optionFlag: {
+    fontSize: 18,
+  },
+  optionFlagSelected: {
     color: colors.background,
   },
 });

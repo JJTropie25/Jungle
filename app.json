@@ -9,9 +9,12 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.lagoon.app",
       "supportsTablet": true
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
+      "package": "com.lagoon.app",
       "adaptiveIcon": {
         "backgroundColor": "#388c4a",
         "foregroundImage": "./assets/images/Lagoon_icon_zoom.png",
@@ -24,8 +27,21 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "extra": {
+      "eas": {
+        "projectId": "3ac596aa-bd3a-4534-ab7e-88d020cbde7c"
+      }
+    },
     "plugins": [
       "expo-router",
+      "expo-notifications",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.lagoon",
+          "enableGooglePay": true
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -37,11 +53,18 @@
             "backgroundColor": "#388c4a"
           }
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3ac596aa-bd3a-4534-ab7e-88d020cbde7c"
+      }
     }
   }
 }

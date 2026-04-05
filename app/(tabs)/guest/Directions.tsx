@@ -2,8 +2,10 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import ResultsMap from "../../../components/ResultsMap";
 import { colors } from "../../../lib/theme";
+import { useEffect, useMemo, useRef, useState } from "react";
+import MapView, { Marker, Polyline } from "react-native-maps";
+import * as Location from "expo-location";
 
 type Params = {
   microservice?: string;
@@ -25,6 +27,47 @@ const cityCoords: Record<string, { lat: number; lon: number }> = {
   "Verona, VR": { lat: 45.4384, lon: 10.9916 },
 };
 
+const directionsKey =
+  process.env.EXPO_PUBLIC_GOOGLE_DIRECTIONS_API_KEY?.trim() ??
+  process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY?.trim() ??
+  "";
+
+type LatLng = { latitude: number; longitude: number };
+
+function decodePolyline(encoded: string): LatLng[] {
+  let index = 0;
+  const len = encoded.length;
+  let lat = 0;
+  let lng = 0;
+  const coordinates: LatLng[] = [];
+
+  while (index < len) {
+    let b = 0;
+    let shift = 0;
+    let result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlat = (result & 1) ? ~(result >> 1) : result >> 1;
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlng = (result & 1) ? ~(result >> 1) : result >> 1;
+    lng += dlng;
+
+    coordinates.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
+  }
+  return coordinates;
+}
+
 export default function Directions() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -37,24 +80,102 @@ export default function Directions() {
     longitude,
   } = useLocalSearchParams<Params>();
 
-  const fallback = cityCoords[destination ?? ""] ?? cityCoords["Roma, RM"];
-  const lat = latitude ? Number(latitude) : fallback.lat;
-  const lon = longitude ? Number(longitude) : fallback.lon;
+  const mapRef = useRef<MapView>(null);
+  const [origin, setOrigin] = useState<LatLng | null>(null);
+  const [route, setRoute] = useState<LatLng[]>([]);
 
-  const results = [
-    {
-      title: microservice ?? "Service",
-      price: "",
-      location: destination ?? "Unknown",
-      latitude: lat,
-      longitude: lon,
-    },
-  ];
+  const destinationCoords = useMemo(() => {
+    const fallback = cityCoords[destination ?? ""] ?? cityCoords["Roma, RM"];
+    const lat = latitude ? Number(latitude) : fallback.lat;
+    const lon = longitude ? Number(longitude) : fallback.lon;
+    return { latitude: lat, longitude: lon };
+  }, [destination, latitude, longitude]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadOrigin = async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      if (!mounted) return;
+      setOrigin({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+    };
+    loadOrigin().catch(() => null);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadRoute = async () => {
+      if (!origin || !directionsKey) {
+        setRoute(origin ? [origin, destinationCoords] : [destinationCoords]);
+        return;
+      }
+      const url =
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}` +
+        `&destination=${destinationCoords.latitude},${destinationCoords.longitude}` +
+        `&mode=walking&key=${encodeURIComponent(directionsKey)}`;
+      const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
+      if (!res.ok) return;
+      const payload = (await res.json()) as {
+        status?: string;
+        routes?: Array<{ overview_polyline?: { points?: string } }>;
+      };
+      if (!mounted) return;
+      if (payload.status !== "OK") {
+        setRoute([origin, destinationCoords]);
+        return;
+      }
+      const points = payload.routes?.[0]?.overview_polyline?.points;
+      if (!points) {
+        setRoute([origin, destinationCoords]);
+        return;
+      }
+      setRoute(decodePolyline(points));
+    };
+    loadRoute().catch(() => null);
+    return () => {
+      mounted = false;
+    };
+  }, [origin, destinationCoords]);
+
+  useEffect(() => {
+    const points = route.length > 1 ? route : [destinationCoords];
+    if (points.length === 0) return;
+    mapRef.current?.fitToCoordinates(points, {
+      edgePadding: { top: 120, bottom: 120, left: 60, right: 60 },
+      animated: true,
+    });
+  }, [route, destinationCoords]);
 
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.mapContainer}>
-        <ResultsMap results={results} selectedTitle={results[0].title} />
+        <MapView ref={mapRef} style={styles.map} initialRegion={{
+          latitude: destinationCoords.latitude,
+          longitude: destinationCoords.longitude,
+          latitudeDelta: 0.4,
+          longitudeDelta: 0.4,
+        }}>
+          {origin ? (
+            <Marker coordinate={origin} title="You" pinColor={colors.warmAccentDark} />
+          ) : null}
+          <Marker
+            coordinate={destinationCoords}
+            title={microservice ?? "Service"}
+            description={destination ?? ""}
+          />
+          {route.length > 1 ? (
+            <Polyline coordinates={route} strokeWidth={4} strokeColor={colors.accent} />
+          ) : null}
+        </MapView>
         <View style={[styles.mapTop, { paddingTop: insets.top + 12 }]}>
           <View style={styles.summaryBox}>
             <TouchableOpacity
@@ -85,6 +206,7 @@ export default function Directions() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.screenBackground },
   mapContainer: { flex: 1 },
+  map: { flex: 1 },
   mapTop: {
     position: "absolute",
     top: 0,

@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: colors.surface,
     marginBottom: 16,
   },
   form: {
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 13,
-    color: colors.textSecondary,
+    color: colors.surface,
     fontWeight: "600",
   },
   input: {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,8 +14,8 @@ import { useAuthState } from "../../../lib/auth";
 import { supabase } from "../../../lib/supabase";
 import { colors } from "../../../lib/theme";
 import { useAppDialog } from "../../../components/AppDialogProvider";
-
-type PaymentMethod = "card" | "wallet" | "cash";
+import { useStripe } from "@stripe/stripe-react-native";
+import { createPaymentIntent } from "../../../lib/stripe";
 
 export default function Payment() {
   const router = useRouter();
@@ -23,6 +23,7 @@ export default function Payment() {
   const { t } = useI18n();
   const { user } = useAuthState();
   const dialog = useAppDialog();
+  const stripe = useStripe();
   const {
     serviceId,
     slotStart,
@@ -43,12 +44,34 @@ export default function Payment() {
     selectedHour?: string;
   }>();
 
-  const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [method, setMethod] = useState<"card" | "cash">("cash");
   const [processing, setProcessing] = useState(false);
+  const [priceEur, setPriceEur] = useState<number | null>(null);
+  const [loadingPrice, setLoadingPrice] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadPrice = async () => {
+      if (!supabase || !serviceId) return;
+      setLoadingPrice(true);
+      const { data } = await supabase
+        .from("services")
+        .select("price_eur")
+        .eq("id", serviceId)
+        .maybeSingle();
+      if (!mounted) return;
+      setPriceEur(Number(data?.price_eur ?? 0));
+      setLoadingPrice(false);
+    };
+    loadPrice().catch(() => setLoadingPrice(false));
+    return () => {
+      mounted = false;
+    };
+  }, [serviceId]);
 
   const handlePay = async () => {
     if (!supabase) {
-      await dialog.alert(t("payment.title"), "Supabase is not configured.");
+      await dialog.alert(t("payment.title"), t("payment.supabaseMissing"));
       return;
     }
     if (!user) {
@@ -61,9 +84,50 @@ export default function Payment() {
     }
 
     setProcessing(true);
-    await new Promise((r) => setTimeout(r, 1200));
 
     const peopleCount = Number(people ?? 1) || 1;
+    let paymentIntentId: string | null = null;
+    let amountCents: number | null = null;
+    let platformFeeCents: number | null = null;
+
+    if (method === "card") {
+      const paymentIntent = await createPaymentIntent({
+        service_id: serviceId,
+        slot_start: slotStart,
+        slot_end: slotEnd,
+        people_count: peopleCount,
+        currency: "eur",
+      });
+
+      if (!paymentIntent.client_secret || !paymentIntent.payment_intent_id) {
+        setProcessing(false);
+        await dialog.alert(t("payment.title"), paymentIntent.error ?? "Payment setup failed.");
+        return;
+      }
+
+      const init = await stripe.initPaymentSheet({
+        paymentIntentClientSecret: paymentIntent.client_secret,
+        merchantDisplayName: "Lagoon",
+        allowsDelayedPaymentMethods: true,
+      });
+      if (init.error) {
+        setProcessing(false);
+        await dialog.alert(t("payment.title"), init.error.message);
+        return;
+      }
+
+      const present = await stripe.presentPaymentSheet();
+      if (present.error) {
+        setProcessing(false);
+        await dialog.alert(t("payment.title"), present.error.message);
+        return;
+      }
+
+      paymentIntentId = paymentIntent.payment_intent_id ?? null;
+      amountCents = paymentIntent.amount_cents ?? null;
+      platformFeeCents = paymentIntent.platform_fee_cents ?? null;
+    }
+
     const qrToken = `BK-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const { data, error } = await supabase
       .from("bookings")
@@ -74,6 +138,11 @@ export default function Payment() {
         slot_end: slotEnd,
         people_count: peopleCount,
         qr_token: qrToken,
+        payment_intent_id: paymentIntentId,
+        payment_status: method === "card" ? "paid" : "cash",
+        amount_cents: amountCents ?? (priceEur != null ? Math.round(priceEur * 100) : null),
+        platform_fee_cents: platformFeeCents,
+        currency: "eur",
       })
       .select("id")
       .single();
@@ -86,13 +155,11 @@ export default function Payment() {
     }
 
     const methodLabel =
-      method === "card"
-        ? t("payment.methodCard")
-        : method === "wallet"
-        ? t("payment.methodWallet")
-        : "Pay in cash at the property";
-
-    await dialog.alert(t("payment.successTitle"), t("payment.successDetail", { method: methodLabel }));
+      method === "card" ? t("payment.methodCard") : t("payment.methodCash");
+    await dialog.alert(
+      t("payment.successTitle"),
+      t("payment.successDetail", { method: methodLabel })
+    );
 
     router.replace({
       pathname: "/(tabs)/guest/BookingConfirmation",
@@ -139,29 +206,21 @@ export default function Payment() {
             <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
           </View>
           <Text style={styles.summaryLine}>
-            Selected times: {selectedHour ?? "-"}
+            {t("payment.selectedTime", { time: selectedHour ?? "-" })}
+          </Text>
+          <Text style={styles.summaryLine}>
+            {loadingPrice ? t("payment.loadingPrice") : `€${(priceEur ?? 0).toFixed(2)}`}
           </Text>
         </View>
 
         <View style={styles.methodColumn}>
           <TouchableOpacity
-            activeOpacity={1}
-            disabled
-            style={[styles.methodCard, styles.methodCardDisabled]}
+            style={[styles.methodCard, method === "card" && styles.methodCardSelected]}
+            onPress={() => setMethod("card")}
           >
-            <MaterialCommunityIcons name="credit-card-outline" size={22} color={colors.textMuted} />
+            <MaterialCommunityIcons name="credit-card-outline" size={22} color={colors.textPrimary} />
             <Text style={styles.methodTitle}>{t("payment.methodCard")}</Text>
-            <Text style={styles.methodHintDisabled}>Coming soon</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={1}
-            disabled
-            style={[styles.methodCard, styles.methodCardDisabled]}
-          >
-            <MaterialCommunityIcons name="wallet-outline" size={22} color={colors.textMuted} />
-            <Text style={styles.methodTitle}>{t("payment.methodWallet")}</Text>
-            <Text style={styles.methodHintDisabled}>Coming soon</Text>
+            <Text style={styles.methodHint}>{t("payment.availableNow")}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -169,8 +228,8 @@ export default function Payment() {
             onPress={() => setMethod("cash")}
           >
             <MaterialCommunityIcons name="cash" size={22} color={colors.warmAccentDark} />
-            <Text style={styles.methodTitle}>Pay in cash at the property</Text>
-            <Text style={styles.methodHint}>Available now</Text>
+            <Text style={styles.methodTitle}>{t("payment.methodCash")}</Text>
+            <Text style={styles.methodHint}>{t("payment.availableNow")}</Text>
           </TouchableOpacity>
         </View>
 
@@ -203,16 +262,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: colors.surface,
   },
   subtitle: {
     marginTop: 8,
-    color: colors.textSecondary,
+    color: colors.surface,
     marginBottom: 14,
   },
   summaryCard: {
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 14,
@@ -242,44 +299,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: "600",
   },
-  methodColumn: {
-    gap: 10,
-    marginBottom: 18,
-  },
-  methodCard: {
-    width: "100%",
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceSoft,
-    padding: 14,
-    gap: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.24,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 7,
-  },
-  methodCardDisabled: {
-    opacity: 0.55,
-    backgroundColor: colors.surface,
-  },
-  methodCardSelected: {
-    borderColor: colors.warmAccent,
-    backgroundColor: colors.warmSurface,
-  },
-  methodTitle: {
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  methodHint: {
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-  methodHintDisabled: {
-    color: colors.textMuted,
-    fontSize: 12,
-  },
   payButton: {
     backgroundColor: colors.textPrimary,
     borderRadius: 10,
@@ -292,5 +311,34 @@ const styles = StyleSheet.create({
   payButtonText: {
     color: colors.background,
     fontWeight: "700",
+  },
+  methodColumn: {
+    gap: 10,
+    marginBottom: 18,
+  },
+  methodCard: {
+    width: "100%",
+    borderRadius: 12,
+    backgroundColor: colors.surfaceSoft,
+    padding: 14,
+    gap: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
+  },
+  methodCardSelected: {
+    borderColor: colors.warmAccent,
+    backgroundColor: colors.warmSurface,
+    borderWidth: 1,
+  },
+  methodTitle: {
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  methodHint: {
+    color: colors.textSecondary,
+    fontSize: 12,
   },
 });

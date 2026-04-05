@@ -10,7 +10,7 @@ import { useI18n } from "../../lib/i18n";
 import { useAuthState } from "../../lib/auth";
 import { colors } from "../../lib/theme";
 import { deleteHostListing, fetchHostListings, resolveHostForUser } from "../../lib/host";
-import { toPriceLabel, type Service } from "../../lib/services";
+import { toCategoryIcon, toDistanceLabel, toPriceLabel, type Service } from "../../lib/services";
 import { useAppDialog } from "../../components/AppDialogProvider";
 
 export default function HostListings() {
@@ -93,8 +93,19 @@ export default function HostListings() {
                     title={item.title}
                     price={toPriceLabel(item.price_eur)}
                     location={item.location}
-                    meta={t(`category.${item.category}`)}
+                    categoryIconName={toCategoryIcon(item.category)}
+                    distanceLabel={
+                      typeof item.distance_meters === "number"
+                        ? toDistanceLabel(item.distance_meters)
+                        : undefined
+                    }
                     rating={item.rating}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(host)/edit-listing",
+                        params: { serviceId: item.id },
+                      })
+                    }
                   />
                   <View style={styles.actionRow}>
                     <TouchableOpacity
@@ -150,7 +161,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: colors.surface,
   },
   addButton: {
     width: 34,

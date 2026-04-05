@@ -16,6 +16,7 @@ export default function GuestLayout() {
       <Stack.Screen name="BookingConfirmation" />
       <Stack.Screen name="Directions" />
       <Stack.Screen name="ManageBooking" />
+      <Stack.Screen name="LeaveReview" />
     </Stack>
   );
 }

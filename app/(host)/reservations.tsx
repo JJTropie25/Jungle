@@ -8,6 +8,8 @@ import { useAuthState } from "../../lib/auth";
 import { colors } from "../../lib/theme";
 import { fetchHostReservations, resolveHostForUser, type HostReservation } from "../../lib/host";
 import { useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { toCategoryIcon } from "../../lib/services";
 
 function toSlotLabel(startIso: string, endIso: string) {
   const start = new Date(startIso);
@@ -72,9 +74,17 @@ export default function HostReservations() {
             data={items}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => (
+            renderItem={({ item }) => {
+              const isExpired = new Date(item.slot_end).getTime() < Date.now();
+              const isCheckedIn = Boolean(item.checked_in_at);
+              const statusLabel = isExpired
+                ? t("booking.expired")
+                : isCheckedIn
+                ? t("host.reservation.checkedIn")
+                : t("host.reservation.reserved");
+              return (
               <TouchableOpacity
-                style={styles.card}
+                style={[styles.card, isExpired && styles.cardExpired]}
                 onPress={() =>
                   router.push({
                     pathname: "/(host)/reservation/[bookingId]",
@@ -87,16 +97,51 @@ export default function HostReservations() {
                   style={styles.cardImage}
                 />
                 <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle}>{item.service_title}</Text>
-                  <Text style={styles.cardText}>{item.service_location}</Text>
-                  <Text style={styles.cardText}>{toSlotLabel(item.slot_start, item.slot_end)}</Text>
-                  <Text style={styles.cardText}>
-                    {t("home.people")}: {item.people_count}
-                  </Text>
-                  <Text style={styles.cardMeta}>Guest ID: {item.guest_id}</Text>
+                  <Text style={[styles.cardTitle, isExpired && styles.textExpired]}>{item.service_title}</Text>
+                  <View style={styles.badgeRow}>
+                    <Text style={styles.guestBadge}>{item.guest_username ?? "Guest"}</Text>
+                    <Text
+                      style={[
+                        styles.statusBadge,
+                        isExpired
+                          ? styles.statusExpired
+                          : isCheckedIn
+                          ? styles.statusCheckedIn
+                          : styles.statusReserved,
+                      ]}
+                    >
+                      {statusLabel}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryStack}>
+                    {item.service_category ? (
+                      <MaterialCommunityIcons
+                        name={toCategoryIcon(item.service_category) as any}
+                        size={16}
+                        color={isExpired ? "#718080" : colors.textPrimary}
+                      />
+                    ) : null}
+                    <Text style={[styles.summaryItem, isExpired && styles.textExpired]}>
+                      {toSlotLabel(item.slot_start, item.slot_end)}
+                    </Text>
+                    <Text style={[styles.summaryItem, isExpired && styles.textExpired]}>
+                      {item.service_location}
+                    </Text>
+                    <View style={styles.summaryPeople}>
+                      <MaterialCommunityIcons
+                        name="account-group"
+                        size={16}
+                        color={isExpired ? "#718080" : colors.textPrimary}
+                      />
+                      <Text style={[styles.summaryPeopleText, isExpired && styles.textExpired]}>
+                        {item.people_count}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </TouchableOpacity>
-            )}
+              );
+            }}
           />
         )}
       </View>
@@ -110,7 +155,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: colors.surface,
   },
   hostSubtitle: {
     marginTop: 4,
@@ -130,32 +175,85 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.background,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    overflow: "hidden",
+    padding: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
+  },
+  cardExpired: {
+    backgroundColor: "#EAF0F0",
+    borderColor: "#B9C9C9",
   },
   cardImage: {
     width: "100%",
     height: 110,
+    borderRadius: 10,
+    marginBottom: 10,
     backgroundColor: colors.surfaceSoft,
   },
   cardBody: {
-    padding: 12,
-    gap: 3,
+    gap: 6,
   },
   cardTitle: {
     color: colors.textPrimary,
     fontWeight: "700",
     fontSize: 16,
   },
-  cardText: {
-    color: colors.textSecondary,
-    fontWeight: "600",
+  textExpired: {
+    color: "#6C7C7C",
   },
-  cardMeta: {
-    marginTop: 4,
-    color: colors.textMuted,
-    fontSize: 12,
+  badgeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  guestBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.surfaceSoft,
+    color: colors.textPrimary,
+    fontWeight: "700",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusBadge: {
+    alignSelf: "flex-start",
+    fontWeight: "700",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    color: "#1C1C1C",
+  },
+  statusReserved: {
+    backgroundColor: "#F5E7A6",
+  },
+  statusCheckedIn: {
+    backgroundColor: "#BFE9D2",
+    color: "#1F6E44",
+  },
+  statusExpired: {
+    backgroundColor: "#D5E0E0",
+    color: "#687878",
+  },
+  summaryStack: {
+    gap: 6,
+  },
+  summaryItem: {
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  summaryPeople: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  summaryPeopleText: {
+    fontWeight: "600",
+    color: colors.textSecondary,
   },
 });

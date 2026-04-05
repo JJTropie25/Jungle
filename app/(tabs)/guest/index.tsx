@@ -23,13 +23,14 @@ import { colors } from "../../../lib/theme";
 import {
   fetchServices,
   toPriceLabel,
-  toTypeKey,
+  toCategoryIcon,
+  toDistanceLabel,
   Service,
 } from "../../../lib/services";
 import { useAuthState } from "../../../lib/auth";
 import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favorites";
 import { getRecentlyViewedIds } from "../../../lib/recentlyViewed";
-import { acceptPolicy, hasAcceptedPolicy } from "../../../lib/policy";
+import { acceptPolicy } from "../../../lib/policy";
 import { PlaceSuggestion, searchPlaceSuggestions } from "../../../lib/geocoding";
 
 export default function GuestHome() {
@@ -51,19 +52,21 @@ export default function GuestHome() {
   } | null>(null);
   const [locationSuggestions, setLocationSuggestions] = useState<PlaceSuggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [suggestionsQueried, setSuggestionsQueried] = useState(false);
+  const [suggestionsQuery, setSuggestionsQuery] = useState("");
   const [searchingDestination, setSearchingDestination] = useState(false);
+  const [searchWarning, setSearchWarning] = useState<string | null>(null);
   const placeholderImage = require("../../../assets/images/react-logo.png");
   const [services, setServices] = useState<Service[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [showPolicyBanner, setShowPolicyBanner] = useState(false);
   const suggestReqSeq = useRef(0);
   const categories = [
-    { label: t("category.rest"), icon: "bed-king" },
-    { label: t("category.shower"), icon: "shower" },
-    { label: t("category.storage"), icon: "locker" },
+    { key: "rest", label: t("category.rest"), icon: "bed-king" },
+    { key: "shower", label: t("category.shower"), icon: "shower" },
+    { key: "storage", label: t("category.storage"), icon: "locker" },
   ];
   useEffect(() => {
     let isMounted = true;
@@ -98,22 +101,6 @@ export default function GuestHome() {
     };
   }, [user]);
 
-  useEffect(() => {
-    let mounted = true;
-    if (!user?.id) {
-      setShowPolicyBanner(false);
-      return () => {
-        mounted = false;
-      };
-    }
-    hasAcceptedPolicy(user.id).then((accepted) => {
-      if (!mounted) return;
-      setShowPolicyBanner(!accepted);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
 
   useFocusEffect(
     useMemo(
@@ -134,7 +121,7 @@ export default function GuestHome() {
   useEffect(() => {
     let isMounted = true;
     const loadLocation = async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== "granted") return;
       const position = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
@@ -195,19 +182,39 @@ export default function GuestHome() {
       )
       .slice(0, 10);
   }, [services, userCoords]);
+
+  const distanceForCard = useMemo(() => {
+    if (!userCoords) return null;
+    return (item: Service) => {
+      if (typeof item.distance_meters === "number") return item.distance_meters;
+      if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+        return haversineMeters(
+          userCoords.latitude,
+          userCoords.longitude,
+          item.latitude,
+          item.longitude
+        );
+      }
+      return null;
+    };
+  }, [userCoords]);
   useEffect(() => {
     const query = destination.trim();
-    if (!showSuggestions || query.length < 3) {
+    if (!showSuggestions || query.length < 1) {
       setLocationSuggestions([]);
       setLoadingSuggestions(false);
+      setSuggestionsQueried(false);
+      setSuggestionsQuery("");
       return;
     }
 
     const controller = new AbortController();
     const reqId = ++suggestReqSeq.current;
+    setSuggestionsQueried(true);
+    setSuggestionsQuery(query);
+    setLoadingSuggestions(true);
     const timer = setTimeout(async () => {
       try {
-        setLoadingSuggestions(true);
         const results = await searchPlaceSuggestions(query, 6);
         if (controller.signal.aborted) return;
         if (reqId === suggestReqSeq.current) {
@@ -262,7 +269,7 @@ export default function GuestHome() {
           { paddingTop: insets.top + 42 },
         ]}
       >
-        <Text style={styles.sectionTitle}>Look for micro-services!</Text>
+        <Text style={styles.sectionTitle}>{t("home.tagline")}</Text>
         {/* Search (always open) */}
         <View style={styles.searchContainer}>
           <View style={styles.searchExpanded}>
@@ -282,12 +289,13 @@ export default function GuestHome() {
               <View style={[styles.categories, styles.fieldGap]}>
                 {categories.map((item) => (
                   <CategoryButton
-                    key={item.label}
+                    key={item.key}
                     label={item.label}
                     icon={item.icon}
                     onPress={() => {
                       closeDropdowns();
                       setMicroservice(item.label);
+                      setSearchWarning(null);
                     }}
                     selected={microservice === item.label}
                   />
@@ -296,87 +304,123 @@ export default function GuestHome() {
             )}
             <View
               style={[
-                styles.inputWithIcon,
-                showSuggestions && locationSuggestions.length > 0 && styles.inputWithIconNoGap,
+                styles.fieldRow,
+                showSuggestions && locationSuggestions.length > 0 && styles.fieldRowNoGap,
               ]}
             >
-              <MaterialCommunityIcons
-                name="map-marker"
-                size={18}
-                color={colors.textSecondary}
-              />
-              <TextInput
-                style={styles.inputField}
-                placeholder={t("home.destination")}
-                value={destination}
-                onChangeText={(text) => {
-                  setDestination(text);
-                  setDestinationCoords(null);
-                  setShowSuggestions(true);
-                }}
-                onFocus={() => {
-                  closeDropdowns();
-                  setShowSuggestions(true);
-                }}
-              />
+              <View style={styles.inputWithIconFlat}>
+                <MaterialCommunityIcons
+                  name="map-marker"
+                  size={18}
+                  color={colors.textSecondary}
+                />
+                  <TextInput
+                    style={styles.inputField}
+                    placeholder={t("home.destination")}
+                    placeholderTextColor={colors.textMuted}
+                    value={destination}
+                  onChangeText={(text) => {
+                    setDestination(text);
+                    setDestinationCoords(null);
+                    setShowSuggestions(true);
+                    setSearchWarning(null);
+                  }}
+                  onFocus={() => {
+                    closeDropdowns();
+                    setShowSuggestions(true);
+                  }}
+                />
+              </View>
             </View>
             {showSuggestions && loadingSuggestions ? (
               <Text style={styles.dropdownLoading}>Searching...</Text>
             ) : null}
+            {showSuggestions &&
+              suggestionsQueried &&
+              !loadingSuggestions &&
+              suggestionsQuery === destination.trim() &&
+              destination.trim().length >= 1 &&
+              locationSuggestions.length === 0 ? (
+              <Text style={styles.dropdownLoading}>No suggestions found</Text>
+            ) : null}
             {showSuggestions && locationSuggestions.length > 0 && (
               <View style={styles.dropdown}>
-                {locationSuggestions.map((item) => (
-                  <TouchableOpacity
-                    key={`${item.label}:${item.latitude}:${item.longitude}`}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setDestination(item.label);
-                      setDestinationCoords({
-                        latitude: item.latitude,
-                        longitude: item.longitude,
-                      });
-                      setShowSuggestions(false);
-                    }}
-                  >
-                    <Text>{item.label}</Text>
-                  </TouchableOpacity>
+                {locationSuggestions.map((item, index) => (
+                  <View key={`${item.label}:${item.latitude}:${item.longitude}`}>
+                    <TouchableOpacity
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setDestination(item.label);
+                        setDestinationCoords({
+                          latitude: item.latitude,
+                          longitude: item.longitude,
+                        });
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      <Text>{item.label}</Text>
+                    </TouchableOpacity>
+                    {index < locationSuggestions.length - 1 ? (
+                      <View style={styles.dropdownDivider} />
+                    ) : null}
+                  </View>
                 ))}
               </View>
             )}
-              <View style={[styles.row, styles.fieldGap]}>
-                <View style={styles.half}>
+              <View style={styles.fieldDivider} />
+              <View style={[styles.fieldRow, styles.fieldRowSplit]}>
+                <View style={styles.splitItem}>
                   <UIDateTimeField
                     mode="date"
                     placeholder={t("home.date")}
                     value={date}
-                    onChange={setDate}
+                    fieldStyle={styles.flatField}
+                    onChange={(value) => {
+                      setDate(value);
+                      setSearchWarning(null);
+                    }}
                   />
                 </View>
-                <View style={styles.half}>
+                <View style={styles.splitDivider} />
+                <View style={styles.splitItem}>
                   <UIDateTimeField
                     mode="time"
                     placeholder={t("home.time")}
                     value={time}
-                    onChange={setTime}
+                    fieldStyle={styles.flatField}
+                    onChange={(value) => {
+                      setTime(value);
+                      setSearchWarning(null);
+                    }}
                   />
                 </View>
               </View>
-              <View style={styles.fieldGap}>
+              <View style={styles.fieldDivider} />
+              <View style={styles.fieldRow}>
                 <UIWheelSelectField
                   placeholder={t("home.people")}
                   value={people}
                   options={["1", "2", "3", "4+"]}
-                  onChange={setPeople}
+                  fieldStyle={styles.flatField}
+                  onChange={(value) => {
+                    setPeople(value);
+                    setSearchWarning(null);
+                  }}
                 />
               </View>
 
               <TouchableOpacity
                 style={[
                   styles.searchButton,
-                  (!isSearchEnabled || searchingDestination) && styles.searchButtonDisabled,
+                  searchingDestination && styles.searchButtonDisabled,
                 ]}
                 onPress={async () => {
                   closeDropdowns();
+                  if (!isSearchEnabled) {
+                    setSearchWarning(t("home.searchMissingFields"));
+                    return;
+                  }
+                  setSearchWarning(null);
                   let coords = destinationCoords;
                   if (!coords && destination.trim().length >= 3) {
                     setSearchingDestination(true);
@@ -401,12 +445,13 @@ export default function GuestHome() {
                     },
                   });
                 }}
-                disabled={!isSearchEnabled || searchingDestination}
+                disabled={searchingDestination}
               >
                 <Text style={styles.searchButtonText}>
                   {searchingDestination ? "Searching..." : t("home.search")}
                 </Text>
               </TouchableOpacity>
+              {searchWarning ? <Text style={styles.searchWarning}>{searchWarning}</Text> : null}
           </View>
         </View>
 
@@ -429,10 +474,11 @@ export default function GuestHome() {
               title={item.title}
               price={toPriceLabel(item.price_eur)}
               location={item.location}
+              categoryIconName={toCategoryIcon(item.category)}
+              distanceLabel={toDistanceLabel(distanceForCard?.(item))}
               imageSource={
                 item.image_url ? { uri: item.image_url } : placeholderImage
               }
-              meta={t(toTypeKey(item.category))}
               rating={item.rating}
               isFavorite={favoriteIds.has(item.id)}
               onToggleFavorite={async () => {
@@ -478,10 +524,11 @@ export default function GuestHome() {
               title={item.title}
               price={toPriceLabel(item.price_eur)}
               location={item.location}
+              categoryIconName={toCategoryIcon(item.category)}
+              distanceLabel={toDistanceLabel(distanceForCard?.(item))}
               imageSource={
                 item.image_url ? { uri: item.image_url } : placeholderImage
               }
-              meta={t(toTypeKey(item.category))}
               rating={item.rating}
               isFavorite={favoriteIds.has(item.id)}
               onToggleFavorite={async () => {
@@ -508,31 +555,6 @@ export default function GuestHome() {
           )}
         />
       </ScrollView>
-      {showPolicyBanner ? (
-        <View style={styles.policyOverlay}>
-          <View style={styles.policyCard}>
-            <Text style={styles.policyTitle}>{t("policy.title")}</Text>
-            <Text style={styles.policyText}>
-              {t("policy.line1")}
-            </Text>
-            <Text style={styles.policyText}>
-              {t("policy.line2")}
-            </Text>
-            <Text style={styles.policyText}>
-              {t("policy.line3")}
-            </Text>
-            <TouchableOpacity
-              style={styles.policyAcceptButton}
-              onPress={async () => {
-                await acceptPolicy(user?.id);
-                setShowPolicyBanner(false);
-              }}
-            >
-              <Text style={styles.policyAcceptText}>{t("policy.accept")}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
     </SafeAreaView>
   );
 }
@@ -559,13 +581,13 @@ const styles = StyleSheet.create({
   },
   searchExpanded: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 18,
+    padding: 16,
     shadowColor: "#000",
-    shadowOpacity: 0.24,
-    shadowRadius: 4,
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 7,
+    elevation: 6,
   },
   categoryBadge: {
     flexDirection: "row",
@@ -592,7 +614,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 10,
     marginBottom: 12,
-    color: colors.textPrimary,
+    color: colors.surface,
   },
   input: {
     borderWidth: 1,
@@ -602,24 +624,38 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: colors.background,
   },
-  inputWithIcon: {
+  fieldRow: {
+    paddingHorizontal: 8,
+    paddingVertical: 14,
+  },
+  fieldRowSplit: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 0,
+  },
+  splitItem: {
+    flex: 1,
+    paddingVertical: 14,
+  },
+  splitDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: colors.surfaceSoft,
+  },
+  fieldRowNoGap: {
+    paddingBottom: 0,
+  },
+  inputWithIconFlat: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10,
-    backgroundColor: colors.background,
-  },
-  inputWithIconNoGap: {
-    marginBottom: 0,
   },
   inputField: {
     flex: 1,
     paddingVertical: 2,
+    color: colors.textPrimary,
+    fontWeight: "700",
+    fontSize: 16,
   },
   row: {
     flexDirection: "row",
@@ -642,15 +678,19 @@ const styles = StyleSheet.create({
   fieldGap: {
     marginBottom: 10,
   },
+  flatField: {
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   selectLabel: {
     color: colors.textPrimary,
   },
   dropdown: {
     marginTop: 0,
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.surfaceSoft,
+    backgroundColor: "#F1FAFA",
+    borderRadius: 12,
     overflow: "hidden",
   },
   dropdownLoading: {
@@ -660,17 +700,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   dropdownItem: {
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceSoft,
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: colors.surfaceSoft,
+    marginHorizontal: 12,
   },
   searchButton: {
-    marginTop: 8,
-    padding: 14,
+    marginTop: 10,
+    padding: 16,
     backgroundColor: colors.warmAccent,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: "center",
+  },
+  fieldDivider: {
+    height: 1,
+    backgroundColor: colors.surfaceSoft,
+    marginHorizontal: 8,
   },
   searchButtonDisabled: {
     backgroundColor: colors.warmAccentSoft,
@@ -679,54 +727,18 @@ const styles = StyleSheet.create({
     color: colors.background,
     fontWeight: "700",
   },
+  searchWarning: {
+    marginTop: 8,
+    color: colors.warmAccentDark,
+    fontSize: 12,
+    fontWeight: "600",
+  },
   horizontalList: {
     overflow: "visible",
   },
   horizontalListContent: {
     paddingVertical: 8,
     paddingHorizontal: 2,
-  },
-  policyOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    padding: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(15,78,78,0.25)",
-  },
-  policyCard: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    width: "100%",
-    maxWidth: 420,
-    padding: 14,
-    gap: 8,
-  },
-  policyTitle: {
-    color: colors.textPrimary,
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  policyText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  policyAcceptButton: {
-    marginTop: 6,
-    backgroundColor: colors.warmAccent,
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  policyAcceptText: {
-    color: colors.background,
-    fontWeight: "700",
   },
 });
 

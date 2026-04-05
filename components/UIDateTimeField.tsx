@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   View,
+  ViewStyle,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "../lib/theme";
@@ -16,6 +17,7 @@ type Props = {
   value: string;
   mode: "date" | "time";
   onChange: (value: string) => void;
+  fieldStyle?: ViewStyle;
 };
 
 function formatDate(date: Date) {
@@ -30,6 +32,7 @@ export default function UIDateTimeField({
   value,
   mode,
   onChange,
+  fieldStyle,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => new Date());
@@ -133,7 +136,7 @@ export default function UIDateTimeField({
     return (
       <View>
         <Pressable
-          style={styles.field}
+          style={[styles.field, fieldStyle]}
           onPress={() => {
             const node = webInputRef.current;
             if (!node) return;
@@ -145,8 +148,10 @@ export default function UIDateTimeField({
             }
           }}
         >
-          <Text style={styles.label}>{value || placeholder}</Text>
           <MaterialCommunityIcons name={icon} size={18} color={colors.textSecondary} />
+          <Text style={[styles.label, !value && styles.placeholder]}>
+            {value || placeholder}
+          </Text>
         </Pressable>
         <input
           ref={webInputRef}
@@ -166,7 +171,7 @@ export default function UIDateTimeField({
   return (
     <View>
       <Pressable
-        style={styles.field}
+        style={[styles.field, fieldStyle]}
         onPress={() => {
           if (mode === "date") {
             setViewDate(selectedDate ?? new Date());
@@ -174,8 +179,10 @@ export default function UIDateTimeField({
           setOpen(true);
         }}
       >
-        <Text style={styles.label}>{value || placeholder}</Text>
         <MaterialCommunityIcons name={icon} size={18} color={colors.textSecondary} />
+        <Text style={[styles.label, !value && styles.placeholder]}>
+          {value || placeholder}
+        </Text>
       </Pressable>
       <Modal
         transparent
@@ -387,10 +394,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 8,
   },
   label: {
     color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  placeholder: {
+    color: colors.textMuted,
+    fontWeight: "700",
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,

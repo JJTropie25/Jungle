@@ -5,19 +5,20 @@ import { useI18n } from "../../lib/i18n";
 import { colors } from "../../lib/theme";
 
 export default function TabsLayout() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   return (
     <Tabs
+      key={language}
       screenOptions={{
         headerShown: false,
         detachInactiveScreens: true,
-        sceneStyle: { backgroundColor: "#E2F2F2" },
+        sceneStyle: { backgroundColor: "#0B3F3F" },
         tabBarStyle: {
-          backgroundColor: "rgba(255,255,255,0.94)",
-          borderTopColor: "rgba(79,155,155,0.55)",
+          backgroundColor: "#4F9B9B",
+          borderTopColor: "rgba(15,78,78,0.4)",
         },
-        tabBarActiveTintColor: colors.textPrimary,
-        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarActiveTintColor: colors.surface,
+        tabBarInactiveTintColor: colors.surface,
         tabBarLabelStyle: {
           fontWeight: "600",
         },
@@ -38,7 +39,7 @@ export default function TabsLayout() {
                 <MaterialCommunityIcons
                   name="home-outline"
                   size={Math.max(22, size)}
-                  color={colors.textSecondary}
+                  color={colors.surface}
                   style={{ position: "absolute", top: 0, left: 0 }}
                 />
               </View>
@@ -46,7 +47,7 @@ export default function TabsLayout() {
               <MaterialCommunityIcons
                 name="home-outline"
                 size={Math.max(22, size)}
-                color={colors.textSecondary}
+                color={colors.surface}
               />
             )
           ),
@@ -67,7 +68,7 @@ export default function TabsLayout() {
                 <MaterialCommunityIcons
                   name="star-outline"
                   size={Math.max(22, size)}
-                  color={colors.textSecondary}
+                  color={colors.surface}
                   style={{ position: "absolute", top: 0, left: 0 }}
                 />
               </View>
@@ -75,7 +76,7 @@ export default function TabsLayout() {
               <MaterialCommunityIcons
                 name="star-outline"
                 size={Math.max(22, size)}
-                color={colors.textSecondary}
+                color={colors.surface}
               />
             )
           ),
@@ -96,7 +97,7 @@ export default function TabsLayout() {
                 <MaterialCommunityIcons
                   name="briefcase-outline"
                   size={Math.max(22, size)}
-                  color={colors.textSecondary}
+                  color={colors.surface}
                   style={{ position: "absolute", top: 0, left: 0 }}
                 />
               </View>
@@ -104,7 +105,7 @@ export default function TabsLayout() {
               <MaterialCommunityIcons
                 name="briefcase-outline"
                 size={Math.max(22, size)}
-                color={colors.textSecondary}
+                color={colors.surface}
               />
             )
           ),
@@ -125,7 +126,7 @@ export default function TabsLayout() {
                 <MaterialCommunityIcons
                   name="account-circle-outline"
                   size={Math.max(22, size)}
-                  color={colors.textSecondary}
+                  color={colors.surface}
                   style={{ position: "absolute", top: 0, left: 0 }}
                 />
               </View>
@@ -133,7 +134,7 @@ export default function TabsLayout() {
               <MaterialCommunityIcons
                 name="account-circle-outline"
                 size={Math.max(22, size)}
-                color={colors.textSecondary}
+                color={colors.surface}
               />
             )
           ),

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   View,
+  ViewStyle,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "../lib/theme";
@@ -17,6 +18,7 @@ type Props = {
   options: string[];
   icon?: string;
   onChange: (value: string) => void;
+  fieldStyle?: ViewStyle;
 };
 
 export default function UIWheelSelectField({
@@ -25,6 +27,7 @@ export default function UIWheelSelectField({
   options,
   icon = "account-group-outline",
   onChange,
+  fieldStyle,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [draftValue, setDraftValue] = useState("");
@@ -61,8 +64,13 @@ export default function UIWheelSelectField({
   if (Platform.OS === "web") {
     const nextValue = value && options.includes(value) ? value : options[0] ?? "";
     return (
-      <View style={styles.field}>
+      <View style={[styles.field, fieldStyle]}>
         <View style={styles.webSelectWrap}>
+          <MaterialCommunityIcons
+            name={icon as any}
+            size={18}
+            color={colors.textSecondary}
+          />
           <select
             value={nextValue}
             onChange={(e) => onChange(e.currentTarget.value)}
@@ -74,11 +82,6 @@ export default function UIWheelSelectField({
               </option>
             ))}
           </select>
-          <MaterialCommunityIcons
-            name={icon as any}
-            size={18}
-            color={colors.textSecondary}
-          />
         </View>
       </View>
     );
@@ -86,13 +89,15 @@ export default function UIWheelSelectField({
 
   return (
     <View>
-      <Pressable style={styles.field} onPress={() => setOpen(true)}>
-        <Text style={styles.label}>{value || placeholder}</Text>
+      <Pressable style={[styles.field, fieldStyle]} onPress={() => setOpen(true)}>
         <MaterialCommunityIcons
           name={icon as any}
           size={18}
           color={colors.textSecondary}
         />
+        <Text style={[styles.label, !value && styles.placeholder]}>
+          {value || placeholder}
+        </Text>
       </Pressable>
 
       <Modal transparent visible={open} animationType="fade" statusBarTranslucent>
@@ -157,10 +162,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 8,
   },
   label: {
     color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  placeholder: {
+    color: colors.textMuted,
+    fontWeight: "700",
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,

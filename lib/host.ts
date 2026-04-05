@@ -5,19 +5,26 @@ export type HostAccount = {
   id: string;
   guest_id: string | null;
   display_name: string | null;
+  stripe_account_id?: string | null;
+  stripe_onboarding_complete?: boolean;
+  stripe_charges_enabled?: boolean;
+  stripe_payouts_enabled?: boolean;
 };
 
 export type HostReservation = {
   id: string;
   guest_id: string;
+  guest_username: string | null;
   people_count: number;
   slot_start: string;
   slot_end: string;
+  checked_in_at: string | null;
   created_at: string | null;
   service_id: string;
   service_title: string;
   service_location: string;
   service_image_url: string | null;
+  service_category: Service["category"] | null;
 };
 
 export async function resolveHostForUser(
@@ -32,6 +39,33 @@ export async function resolveHostForUser(
     .eq("guest_id", userId)
     .maybeSingle();
   return { host: (owned as HostAccount | null) ?? null, preview: false };
+}
+
+export async function ensureHostForUser(
+  userId: string,
+  displayName?: string | null
+): Promise<{ host: HostAccount | null; error: string | null }> {
+  if (!supabase) return { host: null, error: "Supabase not configured." };
+  if (!userId) return { host: null, error: "Missing user id." };
+
+  const { data: existing } = await supabase
+    .from("hosts")
+    .select("id, guest_id, display_name")
+    .eq("guest_id", userId)
+    .maybeSingle();
+  if (existing) return { host: existing as HostAccount, error: null };
+
+  const { data, error } = await supabase
+    .from("hosts")
+    .insert({
+      guest_id: userId,
+      display_name: displayName ?? null,
+    })
+    .select("id, guest_id, display_name")
+    .single();
+
+  if (error) return { host: null, error: error.message };
+  return { host: (data as HostAccount) ?? null, error: null };
 }
 
 export async function fetchHostListings(hostId: string): Promise<Service[]> {
@@ -254,31 +288,67 @@ export async function fetchHostReservations(
   const byService = new Map(
     listings.map((item) => [
       item.id,
-      { title: item.title, location: item.location, image_url: item.image_url ?? null },
+      {
+        title: item.title,
+        location: item.location,
+        image_url: item.image_url ?? null,
+        category: item.category ?? null,
+      },
     ])
   );
 
-  const { data, error } = await supabase
+  const bookingsBase = supabase
     .from("bookings")
-    .select("id, guest_id, people_count, slot_start, slot_end, created_at, service_id")
+    .select("id, guest_id, people_count, slot_start, slot_end, created_at, service_id, checked_in_at")
     .in("service_id", listingIds)
     .order("created_at", { ascending: false });
+  let { data, error } = await bookingsBase;
+  if (error) {
+    const fallback = await supabase
+      .from("bookings")
+      .select("id, guest_id, people_count, slot_start, slot_end, created_at, service_id")
+      .in("service_id", listingIds)
+      .order("created_at", { ascending: false });
+    data = fallback.data as any;
+    error = fallback.error as any;
+  }
 
   if (error || !data) return [];
+
+  const guestIds = Array.from(
+    new Set(
+      data
+        .map((row: any) => row.guest_id as string | null)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  const namesById = new Map<string, string>();
+  if (guestIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, username")
+      .in("id", guestIds);
+    (profiles ?? []).forEach((p: any) => {
+      namesById.set(p.id, p.username ?? "Guest");
+    });
+  }
 
   return data.map((row) => {
     const service = byService.get(row.service_id);
     return {
       id: row.id,
       guest_id: row.guest_id,
+      guest_username: namesById.get(row.guest_id) ?? "Guest",
       people_count: row.people_count,
       slot_start: row.slot_start,
       slot_end: row.slot_end,
+      checked_in_at: row.checked_in_at ?? null,
       created_at: row.created_at,
       service_id: row.service_id,
       service_title: service?.title ?? "-",
       service_location: service?.location ?? "-",
       service_image_url: service?.image_url ?? null,
+      service_category: service?.category ?? null,
     };
   });
 }

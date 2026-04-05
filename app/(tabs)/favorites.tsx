@@ -14,7 +14,7 @@ import {
   fetchFavoriteServices,
   removeFavorite,
 } from "../../lib/favorites";
-import { toPriceLabel, toTypeKey } from "../../lib/services";
+import { toCategoryIcon, toDistanceLabel, toPriceLabel } from "../../lib/services";
 import { useFocusEffect } from "@react-navigation/native";
 
 export default function Favorites() {
@@ -92,7 +92,12 @@ export default function Favorites() {
               title={item.title}
               price={toPriceLabel(item.price_eur)}
               location={item.location}
-              meta={t(toTypeKey(item.category))}
+              categoryIconName={toCategoryIcon(item.category)}
+              distanceLabel={
+                typeof item.distance_meters === "number"
+                  ? toDistanceLabel(item.distance_meters)
+                  : undefined
+              }
               rating={item.rating}
               isFavorite={favoriteIds.has(item.id)}
               onToggleFavorite={async () => {
@@ -137,7 +142,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     marginBottom: 12,
-    color: colors.textPrimary,
+    color: colors.surface,
   },
   card: {
     marginBottom: 12,

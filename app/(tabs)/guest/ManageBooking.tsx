@@ -31,9 +31,13 @@ export default function ManageBooking() {
       from?: string;
       bookingId?: string;
       qrToken?: string;
+      expired?: string;
     }>();
   const [token, setToken] = useState<string | null>(qrToken ?? null);
   const [hostPhone, setHostPhone] = useState<string | null>(null);
+  const [slotStart, setSlotStart] = useState<string | null>(null);
+  const [serviceId, setServiceId] = useState<string | null>(null);
+  const [hasReview, setHasReview] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const { user } = useAuthState();
 
@@ -60,13 +64,35 @@ export default function ManageBooking() {
     if (!supabase || !bookingId) return;
     supabase
       .from("bookings")
-      .select("qr_token")
+      .select("qr_token, slot_start, service_id")
       .eq("id", bookingId)
       .single()
       .then(({ data }) => {
         if (!isMounted) return;
         if (data?.qr_token) setToken(data.qr_token);
+        setSlotStart(data?.slot_start ?? null);
+        setServiceId(data?.service_id ?? null);
       });
+    return () => {
+      isMounted = false;
+    };
+  }, [bookingId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!supabase || !bookingId) return;
+
+    supabase
+      .from("service_reviews")
+      .select("id")
+      .eq("booking_id", bookingId)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!isMounted) return;
+        setHasReview(Boolean(data?.id));
+      });
+
     return () => {
       isMounted = false;
     };
@@ -127,6 +153,8 @@ export default function ManageBooking() {
     };
   }, [bookingId]);
 
+  const isExpired = slotStart ? new Date(slotStart).getTime() < Date.now() : false;
+
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView
@@ -173,127 +201,153 @@ export default function ManageBooking() {
         </View>
 
         <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.danger]}
-            onPress={async () => {
-              if (!bookingId || !supabase) {
-                await dialog.alert(t("booking.cancel"), "Unable to cancel this booking.");
-                return;
-              }
+          {isExpired ? (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.reviewButton]}
+              onPress={() => {
+                if (!bookingId || !serviceId) return;
+                router.push({
+                  pathname: "/(tabs)/guest/LeaveReview",
+                  params: {
+                    bookingId,
+                    serviceId,
+                    microservice,
+                    destination,
+                    timeslot,
+                  },
+                });
+              }}
+              disabled={hasReview}
+            >
+              <Text style={styles.actionTextLight}>
+                {hasReview ? t("review.alreadySubmitted") : t("review.leave")}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.danger]}
+                onPress={async () => {
+                  if (!bookingId || !supabase) {
+                    await dialog.alert(t("booking.cancel"), "Unable to cancel this booking.");
+                    return;
+                  }
 
-              const confirmed = await dialog.confirm({
-                title: t("booking.cancel"),
-                message: t("booking.cancelConfirm"),
-                cancelText: t("booking.cancelNo"),
-                confirmText: t("booking.cancelYes"),
-                confirmVariant: "danger",
-              });
-              if (!confirmed) return;
+                  const confirmed = await dialog.confirm({
+                    title: t("booking.cancel"),
+                    message: t("booking.cancelConfirm"),
+                    cancelText: t("booking.cancelNo"),
+                    confirmText: t("booking.cancelYes"),
+                    confirmVariant: "danger",
+                  });
+                  if (!confirmed) return;
 
-              setCanceling(true);
-              try {
-                const sessionUser = user ?? (await waitForSession(3000));
-                const activeUserId = sessionUser?.id ?? null;
-                if (!activeUserId) {
-                  setCanceling(false);
-                  await dialog.alert(
-                    t("booking.cancel"),
-                    t("bookings.signIn") || "Please sign in to cancel bookings."
-                  );
-                  return;
-                }
+                  setCanceling(true);
+                  try {
+                    const sessionUser = user ?? (await waitForSession(3000));
+                    const activeUserId = sessionUser?.id ?? null;
+                    if (!activeUserId) {
+                      setCanceling(false);
+                      await dialog.alert(
+                        t("booking.cancel"),
+                        t("bookings.signIn") || "Please sign in to cancel bookings."
+                      );
+                      return;
+                    }
 
-                const idToUse = bookingId && /^[0-9]+$/.test(String(bookingId)) ? Number(bookingId) : bookingId;
-                console.log("ManageBooking: attempting delete", { bookingId: idToUse, userId: activeUserId });
+                    const idToUse = bookingId && /^[0-9]+$/.test(String(bookingId)) ? Number(bookingId) : bookingId;
+                    console.log("ManageBooking: attempting delete", { bookingId: idToUse, userId: activeUserId });
 
-                const { data: fetchData, error: fetchErr } = await supabase
-                  .from("bookings")
-                  .select("guest_id")
-                  .eq("id", idToUse as any)
-                  .maybeSingle();
-                if (fetchErr) {
-                  setCanceling(false);
-                  console.warn("ManageBooking: fetch owner error", fetchErr);
-                  await dialog.alert(t("booking.cancel"), fetchErr.message);
-                  return;
-                }
-                if (!fetchData || fetchData.guest_id !== activeUserId) {
-                  setCanceling(false);
-                  console.warn("ManageBooking: permission denied or booking not found", fetchData);
-                  await dialog.alert(
-                    t("booking.cancel"),
-                    t("booking.cancelNotAllowed") || "You are not allowed to cancel this booking."
-                  );
-                  return;
-                }
+                    const { data: fetchData, error: fetchErr } = await supabase
+                      .from("bookings")
+                      .select("guest_id")
+                      .eq("id", idToUse as any)
+                      .maybeSingle();
+                    if (fetchErr) {
+                      setCanceling(false);
+                      console.warn("ManageBooking: fetch owner error", fetchErr);
+                      await dialog.alert(t("booking.cancel"), fetchErr.message);
+                      return;
+                    }
+                    if (!fetchData || fetchData.guest_id !== activeUserId) {
+                      setCanceling(false);
+                      console.warn("ManageBooking: permission denied or booking not found", fetchData);
+                      await dialog.alert(
+                        t("booking.cancel"),
+                        t("booking.cancelNotAllowed") || "You are not allowed to cancel this booking."
+                      );
+                      return;
+                    }
 
-                const { data, error, status } = await supabase
-                  .from("bookings")
-                  .delete()
-                  .eq("id", idToUse as any)
-                  .eq("guest_id", activeUserId)
-                  .select("*");
-                console.log("ManageBooking: delete result", { data, error, status });
-                if (error) {
-                  setCanceling(false);
-                  await dialog.alert(t("booking.cancel"), error.message);
-                  return;
-                }
+                    const { data, error, status } = await supabase
+                      .from("bookings")
+                      .delete()
+                      .eq("id", idToUse as any)
+                      .eq("guest_id", activeUserId)
+                      .select("*");
+                    console.log("ManageBooking: delete result", { data, error, status });
+                    if (error) {
+                      setCanceling(false);
+                      await dialog.alert(t("booking.cancel"), error.message);
+                      return;
+                    }
 
-                if (Array.isArray(data) && data.length > 0) {
-                  setCanceling(false);
-                  router.replace("/(tabs)/bookings");
-                  return;
-                }
+                    if (Array.isArray(data) && data.length > 0) {
+                      setCanceling(false);
+                      router.replace("/(tabs)/bookings");
+                      return;
+                    }
 
-                const { data: verify, error: verifyErr } = await supabase
-                  .from("bookings")
-                  .select("id")
-                  .eq("id", idToUse as any)
-                  .maybeSingle();
-                setCanceling(false);
-                if (verifyErr) {
-                  console.warn("ManageBooking: verify existence error", verifyErr);
-                  await dialog.alert(t("booking.cancel"), verifyErr.message);
-                  return;
-                }
-                if (verify && verify.id) {
-                  await dialog.alert(
-                    t("booking.cancel"),
-                    t("booking.cancelFailed") ||
-                      `Unable to delete booking ${String(idToUse)}. This is likely due to Row Level Security blocking the operation or the request missing an auth token.`
-                  );
-                  return;
-                }
+                    const { data: verify, error: verifyErr } = await supabase
+                      .from("bookings")
+                      .select("id")
+                      .eq("id", idToUse as any)
+                      .maybeSingle();
+                    setCanceling(false);
+                    if (verifyErr) {
+                      console.warn("ManageBooking: verify existence error", verifyErr);
+                      await dialog.alert(t("booking.cancel"), verifyErr.message);
+                      return;
+                    }
+                    if (verify && verify.id) {
+                      await dialog.alert(
+                        t("booking.cancel"),
+                        t("booking.cancelFailed") ||
+                          `Unable to delete booking ${String(idToUse)}. This is likely due to Row Level Security blocking the operation or the request missing an auth token.`
+                      );
+                      return;
+                    }
 
-                router.replace("/(tabs)/bookings");
-              } catch (e: any) {
-                setCanceling(false);
-                await dialog.alert(t("booking.cancel"), e?.message || String(e));
-              }
-            }}
-            disabled={canceling}
-          >
-            <Text style={styles.actionTextLight}>{t("booking.cancel")}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={async () => {
-              if (!hostPhone) {
-                await dialog.alert(t("booking.contact"), "Host phone is not available.");
-                return;
-              }
-              const url = `tel:${hostPhone}`;
-              const supported = await Linking.canOpenURL(url);
-              if (!supported) {
-                await dialog.alert(t("booking.contact"), "Unable to open phone dialer.");
-                return;
-              }
-              await Linking.openURL(url);
-            }}
-          >
-            <Text style={styles.actionText}>{t("booking.contact")}</Text>
-          </TouchableOpacity>
+                    router.replace("/(tabs)/bookings");
+                  } catch (e: any) {
+                    setCanceling(false);
+                    await dialog.alert(t("booking.cancel"), e?.message || String(e));
+                  }
+                }}
+                disabled={canceling}
+              >
+                <Text style={styles.actionTextLight}>{t("booking.cancel")}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={async () => {
+                  if (!hostPhone) {
+                    await dialog.alert(t("booking.contact"), "Host phone is not available.");
+                    return;
+                  }
+                  const url = `tel:${hostPhone}`;
+                  const supported = await Linking.canOpenURL(url);
+                  if (!supported) {
+                    await dialog.alert(t("booking.contact"), "Unable to open phone dialer.");
+                    return;
+                  }
+                  await Linking.openURL(url);
+                }}
+              >
+                <Text style={styles.actionText}>{t("booking.contact")}</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -386,5 +440,8 @@ const styles = StyleSheet.create({
   actionTextLight: {
     fontWeight: "600",
     color: colors.background,
+  },
+  reviewButton: {
+    backgroundColor: colors.warmAccentDark,
   },
 });

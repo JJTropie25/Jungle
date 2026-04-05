@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -14,6 +14,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { colors } from "../../lib/theme";
 import { useI18n } from "../../lib/i18n";
 import {
@@ -30,6 +31,7 @@ import {
   reverseGeocodeLabel,
   searchPlaceSuggestions,
 } from "../../lib/geocoding";
+import { fetchServiceReviews, type ServiceReview } from "../../lib/reviews";
 
 const SLOT_OPTIONS = Array.from({ length: 18 }, (_, i) => {
   const h = 9 + Math.floor(i / 2);
@@ -71,6 +73,8 @@ export default function HostEditListing() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [reviews, setReviews] = useState<ServiceReview[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
   const suggestReqSeq = useRef(0);
 
   const parseCurrentCoords = () => {
@@ -126,6 +130,27 @@ export default function HostEditListing() {
       mounted = false;
     };
   }, [serviceId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      if (!serviceId) {
+        setReviews([]);
+        return () => {
+          mounted = false;
+        };
+      }
+      setLoadingReviews(true);
+      fetchServiceReviews(serviceId).then((data) => {
+        if (!mounted) return;
+        setReviews(data);
+        setLoadingReviews(false);
+      });
+      return () => {
+        mounted = false;
+      };
+    }, [serviceId])
+  );
 
   useEffect(() => {
     const query = location.trim();
@@ -345,6 +370,23 @@ export default function HostEditListing() {
           ))}
         </View>
 
+        <Text style={styles.label}>{t("host.reviews.title")}</Text>
+        <View style={styles.reviewsWrap}>
+          {loadingReviews ? <Text style={styles.reviewsHint}>{t("host.reviews.loading")}</Text> : null}
+          {!loadingReviews && reviews.length === 0 ? (
+            <Text style={styles.reviewsHint}>{t("host.reviews.empty")}</Text>
+          ) : null}
+          {reviews.map((review) => (
+            <View key={review.id} style={styles.reviewCard}>
+              <View style={styles.reviewHeader}>
+                <Text style={styles.reviewAuthor}>{review.author_name}</Text>
+                <Text style={styles.reviewScore}>{review.rating_10}/10</Text>
+              </View>
+              <Text style={styles.reviewBody}>{review.description}</Text>
+            </View>
+          ))}
+        </View>
+
         <TouchableOpacity
           style={[styles.saveButton, (!canSave || saving) && styles.saveButtonDisabled]}
           onPress={onSave}
@@ -409,15 +451,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: colors.surface,
     marginBottom: 8,
   },
   loading: {
-    color: colors.textSecondary,
+    color: colors.surface,
     marginBottom: 10,
   },
   label: {
-    color: colors.textSecondary,
+    color: colors.surface,
     fontWeight: "600",
     marginBottom: 6,
     marginTop: 10,
@@ -475,7 +517,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   photoHint: {
-    color: colors.textMuted,
+    color: colors.surface,
     fontSize: 12,
     fontWeight: "600",
     marginBottom: 6,
@@ -522,7 +564,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   coordsHint: {
-    color: colors.textMuted,
+    color: colors.surface,
     fontSize: 12,
     fontWeight: "600",
   },
@@ -533,7 +575,7 @@ const styles = StyleSheet.create({
   },
   suggestHint: {
     marginTop: 6,
-    color: colors.textMuted,
+    color: colors.surface,
     fontSize: 12,
     fontWeight: "600",
   },
@@ -634,5 +676,40 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: "600",
     textAlign: "center",
+  },
+  reviewsWrap: {
+    marginTop: 2,
+    gap: 8,
+  },
+  reviewsHint: {
+    color: colors.surface,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  reviewCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    backgroundColor: colors.background,
+    padding: 10,
+    gap: 4,
+  },
+  reviewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  reviewAuthor: {
+    color: colors.textPrimary,
+    fontWeight: "700",
+  },
+  reviewScore: {
+    color: colors.warmAccentDark,
+    fontWeight: "700",
+  },
+  reviewBody: {
+    color: colors.textSecondary,
+    fontWeight: "500",
+    lineHeight: 18,
   },
 });

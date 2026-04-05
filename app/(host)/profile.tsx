@@ -9,6 +9,10 @@ import { supabase } from "../../lib/supabase";
 import TabTopNotch from "../../components/TabTopNotch";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import * as WebBrowser from "expo-web-browser";
+import { createAccountLink, createConnectedAccount, getStripeReturnUrl } from "../../lib/stripe";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function HostProfile() {
   const router = useRouter();
@@ -17,6 +21,8 @@ export default function HostProfile() {
   const dialog = useAppDialog();
   const { user } = useAuthState();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [hostStatus, setHostStatus] = useState<any>(null);
+  const [activating, setActivating] = useState(false);
 
   const handleLogout = async () => {
     if (!supabase) {
@@ -52,11 +58,47 @@ export default function HostProfile() {
           if (!isMounted) return;
           setAvatarUrl(data?.avatar_url ?? null);
         });
+      supabase
+        .from("hosts")
+        .select(
+          "id, stripe_account_id, stripe_onboarding_complete, stripe_charges_enabled, stripe_payouts_enabled"
+        )
+        .eq("guest_id", user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!isMounted) return;
+          setHostStatus(data ?? null);
+        });
       return () => {
         isMounted = false;
       };
     }, [user])
   );
+
+  const handleActivatePayments = async () => {
+    if (!user) return;
+    setActivating(true);
+    const created = await createConnectedAccount();
+    if (created.error) {
+      setActivating(false);
+      await dialog.alert("Payments", created.error);
+      return;
+    }
+    const returnUrl = getStripeReturnUrl("/host-onboarding");
+    const refreshUrl = getStripeReturnUrl("/host-onboarding");
+    if (!returnUrl || !refreshUrl) {
+      setActivating(false);
+      await dialog.alert("Payments", "Missing Supabase URL.");
+      return;
+    }
+    const link = await createAccountLink(returnUrl, refreshUrl);
+    setActivating(false);
+    if (link.error || !link.url) {
+      await dialog.alert("Payments", link.error ?? "Could not start onboarding.");
+      return;
+    }
+    await WebBrowser.openBrowserAsync(link.url);
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -78,6 +120,25 @@ export default function HostProfile() {
           </Text>
         </View>
         <View style={styles.actions}>
+          <View style={styles.paymentCard}>
+            <Text style={styles.paymentTitle}>{t("payments.title")}</Text>
+            <Text style={styles.paymentBody}>
+              {hostStatus?.stripe_onboarding_complete
+                ? t("payments.active")
+                : t("payments.inactive")}
+            </Text>
+            {!hostStatus?.stripe_onboarding_complete ? (
+              <Pressable
+                style={[styles.primaryButton, activating && styles.disabled]}
+                onPress={handleActivatePayments}
+                disabled={activating}
+              >
+                <Text style={styles.primaryButtonText}>
+                  {activating ? t("auth.loading") : t("payments.activate")}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
           <Pressable style={styles.primaryButton} onPress={() => router.replace("/(tabs)/guest")}>
             <Text style={styles.primaryButtonText}>{t("host.profile.switchGuest")}</Text>
           </Pressable>
@@ -122,17 +183,34 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 18,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: colors.surface,
   },
   actions: {
     width: "100%",
     gap: 12,
+  },
+  paymentCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    gap: 8,
+  },
+  paymentTitle: {
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  paymentBody: {
+    color: colors.textSecondary,
+    fontWeight: "600",
   },
   primaryButton: {
     backgroundColor: colors.warmAccent,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
+  },
+  disabled: {
+    opacity: 0.7,
   },
   primaryButtonText: {
     color: colors.background,

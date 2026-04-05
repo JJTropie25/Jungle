@@ -10,6 +10,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { useI18n } from "../../../lib/i18n";
 import { supabase } from "../../../lib/supabase";
 import { useAuthState } from "../../../lib/auth";
@@ -17,6 +18,7 @@ import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favo
 import { colors } from "../../../lib/theme";
 import { addRecentlyViewedId } from "../../../lib/recentlyViewed";
 import { useAppDialog } from "../../../components/AppDialogProvider";
+import { fetchServiceReviews, type ServiceReview } from "../../../lib/reviews";
 
 export default function ServiceDetails() {
   const router = useRouter();
@@ -41,29 +43,7 @@ export default function ServiceDetails() {
   const [serviceLocation, setServiceLocation] = useState<string | null>(null);
   const [serviceDescription, setServiceDescription] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
-  const reviews = useMemo(
-    () => [
-      {
-        id: "r1",
-        author: "Giulia M.",
-        rating: "4.8",
-        text: "Very clean spot and quick access. Perfect for a short stop.",
-      },
-      {
-        id: "r2",
-        author: "Luca R.",
-        rating: "4.6",
-        text: "Easy check-in and friendly host. Would book again.",
-      },
-      {
-        id: "r3",
-        author: "Sara T.",
-        rating: "4.9",
-        text: "Exactly as described, great location and smooth booking.",
-      },
-    ],
-    []
-  );
+  const [reviews, setReviews] = useState<ServiceReview[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -144,6 +124,28 @@ export default function ServiceDetails() {
     addRecentlyViewedId(serviceId, user?.id);
   }, [serviceId, user?.id]);
 
+  useFocusEffect(
+    useMemo(
+      () => () => {
+        let mounted = true;
+        if (!serviceId) {
+          setReviews([]);
+          return () => {
+            mounted = false;
+          };
+        }
+        fetchServiceReviews(serviceId).then((data) => {
+          if (!mounted) return;
+          setReviews(data);
+        });
+        return () => {
+          mounted = false;
+        };
+      },
+      [serviceId]
+    )
+  );
+
   const toggleFavorite = async () => {
     if (!user || !serviceId) {
       await dialog.alert(t("favorites.title"), t("favorites.signIn"));
@@ -170,10 +172,18 @@ export default function ServiceDetails() {
     if (slots.length === 0) {
       return ["09:00", "10:00", "11:00", "12:00", "14:00", "15:00"];
     }
-    return slots.map((s) => s.time);
+    return Array.from(new Set(slots.map((s) => s.time)));
   }, [slots]);
   const summaryTitle = serviceTitle ?? microservice ?? "-";
   const summaryLocation = serviceLocation ?? destination ?? "-";
+
+  const requestedDate = useMemo(() => {
+    const raw = String(timeslot ?? "").trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return null;
+    const [, y, m, d] = match;
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  }, [timeslot]);
 
   const handleBooking = async () => {
     if (!user) {
@@ -182,11 +192,19 @@ export default function ServiceDetails() {
     }
     if (!serviceId || !selectedHour) return;
 
-    const match = slots.find((s) => s.time === selectedHour);
-    const slotStart = match?.start ?? new Date().toISOString();
-    const slotEnd =
-      match?.end ??
-      new Date(new Date(slotStart).getTime() + 30 * 60 * 1000).toISOString();
+    const [hh, mm] = selectedHour.split(":").map((v) => Number(v));
+    const baseDate = requestedDate ?? new Date();
+    const bookingStart = new Date(baseDate);
+    bookingStart.setHours(hh, mm, 0, 0);
+
+    // If user did not choose a specific date, avoid creating immediately expired bookings.
+    if (!requestedDate && bookingStart.getTime() < Date.now()) {
+      bookingStart.setDate(bookingStart.getDate() + 1);
+    }
+
+    const bookingEnd = new Date(bookingStart.getTime() + 30 * 60 * 1000);
+    const slotStart = bookingStart.toISOString();
+    const slotEnd = bookingEnd.toISOString();
 
     router.push({
       pathname: "/(tabs)/guest/Payment",
@@ -252,11 +270,14 @@ export default function ServiceDetails() {
           )}
         </View>
 
-        <Text style={styles.sectionTitle}>Description</Text>
+        <Text style={styles.sectionTitle}>{t("service.description")}</Text>
         <View style={styles.infoCard}>
           <Text style={styles.infoText}>
             {serviceDescription ??
-              `${summaryTitle} near ${summaryLocation} is designed for fast, reliable access with clear check-in flow, secure space, and flexible timing.`}
+              t("service.descriptionFallback", {
+                title: summaryTitle,
+                location: summaryLocation,
+              })}
           </Text>
         </View>
 
@@ -284,15 +305,19 @@ export default function ServiceDetails() {
           ))}
         </ScrollView>
 
-        <Text style={styles.sectionTitle}>Reviews</Text>
+        <Text style={styles.sectionTitle}>{t("service.reviews")}</Text>
         <View style={styles.reviewsList}>
-          {reviews.map((review) => (
+          {reviews.length === 0 ? (
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewText}>{t("review.none")}</Text>
+            </View>
+          ) : reviews.map((review) => (
             <View key={review.id} style={styles.reviewCard}>
               <View style={styles.reviewHeader}>
-                <Text style={styles.reviewAuthor}>{review.author}</Text>
-                <Text style={styles.reviewRating}>★ {review.rating}</Text>
+                <Text style={styles.reviewAuthor}>{review.author_name}</Text>
+                <Text style={styles.reviewRating}>{review.rating_10}/10</Text>
               </View>
-              <Text style={styles.reviewText}>{review.text}</Text>
+              <Text style={styles.reviewText}>{review.description}</Text>
             </View>
           ))}
         </View>
@@ -392,15 +417,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: colors.textPrimary,
+    color: colors.surface,
     marginBottom: 10,
     marginTop: 6,
   },
   infoCard: {
     backgroundColor: colors.background,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
     padding: 12,
     marginBottom: 12,
   },
@@ -434,8 +457,6 @@ const styles = StyleSheet.create({
   },
   reviewCard: {
     backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 12,
     padding: 12,
   },

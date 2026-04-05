@@ -44,13 +44,21 @@ export function toPriceLabel(price: number) {
 export function toDistanceLabel(distanceMeters?: number | null) {
   if (!distanceMeters && distanceMeters !== 0) return "-";
   if (distanceMeters >= 1000) {
-    return `${(distanceMeters / 1000).toFixed(1)}km`;
+    const km = Math.floor(distanceMeters / 1000);
+    return `${km}km`;
   }
-  return `${distanceMeters}m`;
+  const meters = Math.floor(distanceMeters);
+  return `${meters}m`;
 }
 
 export function toTypeKey(category: Service["category"]) {
   if (category === "rest") return "category.rest";
   if (category === "shower") return "category.shower";
   return "category.storage";
+}
+
+export function toCategoryIcon(category: Service["category"]) {
+  if (category === "rest") return "bed-king";
+  if (category === "shower") return "shower";
+  return "locker";
 }

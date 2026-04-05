@@ -20,7 +20,7 @@ import {
   Service,
   toDistanceLabel,
   toPriceLabel,
-  toTypeKey,
+  toCategoryIcon,
 } from "../../../lib/services";
 import { useAuthState } from "../../../lib/auth";
 import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favorites";
@@ -147,8 +147,13 @@ export default function SearchResults() {
     if (normalizedCategory) {
       items = items.filter((s) => s.category === normalizedCategory);
     }
+
+    const hasCoords = items.some(
+      (s) => typeof s.latitude === "number" && typeof s.longitude === "number"
+    );
+
     if (destination) {
-      if (destinationCoords) {
+      if (destinationCoords && hasCoords) {
         const radiusMeters = Math.max(1, distanceMax) * 1000;
         items = items.filter((s) => distanceForService(s) <= radiusMeters);
       } else {
@@ -157,7 +162,7 @@ export default function SearchResults() {
       }
     }
     items = items.filter((s) => s.price_eur <= priceMax);
-    if (!destinationCoords) {
+    if (!destinationCoords || !hasCoords) {
       items = items.filter((s) => distanceForService(s) <= distanceMax * 1000);
     }
     items = items.filter((s) => (s.rating ?? 0) >= ratingMin);
@@ -217,6 +222,12 @@ export default function SearchResults() {
           ? "es-ES"
           : language === "zh"
           ? "zh-CN"
+          : language === "de"
+          ? "de-DE"
+          : language === "fr"
+          ? "fr-FR"
+          : language === "ja"
+          ? "ja-JP"
           : "en-US";
       let month = new Intl.DateTimeFormat(locale, { month: "short" }).format(date);
       month = month.charAt(0).toUpperCase() + month.slice(1);
@@ -481,9 +492,8 @@ export default function SearchResults() {
                 title={item.title}
                 price={toPriceLabel(item.price_eur)}
                 location={item.location}
-                meta={`${t(toTypeKey(item.category))} - ${toDistanceLabel(
-                  distanceForService(item)
-                )}`}
+                categoryIconName={toCategoryIcon(item.category)}
+                distanceLabel={toDistanceLabel(distanceForService(item))}
                 rating={item.rating}
                 isFavorite={favoriteIds.has(item.id)}
                 onToggleFavorite={async () => {
@@ -618,9 +628,8 @@ export default function SearchResults() {
                   title={item.title}
                   price={toPriceLabel(item.price_eur)}
                 location={item.location}
-                meta={`${t(toTypeKey(item.category))} - ${toDistanceLabel(
-                    distanceForService(item)
-                  )}`}
+                categoryIconName={toCategoryIcon(item.category)}
+                distanceLabel={toDistanceLabel(distanceForService(item))}
                   rating={item.rating}
                   isFavorite={favoriteIds.has(item.id)}
                   onToggleFavorite={async () => {
@@ -671,7 +680,7 @@ const styles = StyleSheet.create({
   listHeader: {
     paddingHorizontal: 16,
     paddingBottom: 4,
-    backgroundColor: colors.background,
+    backgroundColor: "#4F9B9B",
   },
   container: {
     padding: 16,
@@ -731,7 +740,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 7,
   },
-  cardImage: { height: 90 },
+  cardImage: { flex: 1 },
   mapContainer: { flex: 1 },
   mapTop: {
     position: "absolute",
@@ -739,6 +748,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: 16,
+    backgroundColor: "#4F9B9B",
   },
   mapBottom: {
     position: "absolute",
@@ -749,7 +759,7 @@ const styles = StyleSheet.create({
   },
   mapCards: { paddingRight: 16 },
   mapCard: { width: 260, marginRight: 12 },
-  mapCardImage: { height: 80 },
+  mapCardImage: { flex: 1 },
   menuWrap: { gap: 8, marginBottom: 8 },
   menuBox: {
     backgroundColor: colors.background,
