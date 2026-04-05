@@ -8,11 +8,11 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyCxjnYpUX-BLVZR2N8oysgRfYrA6Mmi4nw",
-        "EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY": "AIzaSyDTcInNA796ebihD4zVComVks9NtRIFw-I",
-        "EXPO_PUBLIC_GOOGLE_PLACES_API_KEY": "AIzaSyBYKshp827LG1LHyUR3jm89syV7pn-AgSQ",
-        "EXPO_PUBLIC_GOOGLE_DIRECTIONS_API_KEY": "AIzaSyB1fneW4ePOMlDaVi1t-o0x4tVWkLzAJWg",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51TI8ovAiH4yiAzhsiKixk2LeENJRb0by0NQSpGZPeSfYJyFvShpO0bnQUjwQ0Ig70BQvOxFHjoqFxbvKgSOmfEIS00vAXsEI1g"
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "",
+        "EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY": "",
+        "EXPO_PUBLIC_GOOGLE_PLACES_API_KEY": "",
+        "EXPO_PUBLIC_GOOGLE_DIRECTIONS_API_KEY": "",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": ""
       }
     },
     "preview": {

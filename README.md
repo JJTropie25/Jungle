@@ -58,3 +58,14 @@ Project settings -> Your apps -> Android -> Download config.
 Place it at the project root as `google-services.json`.
 
 These files are intentionally git-ignored.
+
+### EAS build secrets
+Do not put API keys in `eas.json`. Instead set them in EAS:
+
+- `eas secret:create --name EXPO_PUBLIC_GOOGLE_MAPS_API_KEY --value "..." --scope project`
+- `eas secret:create --name EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY --value "..." --scope project`
+- `eas secret:create --name EXPO_PUBLIC_GOOGLE_PLACES_API_KEY --value "..." --scope project`
+- `eas secret:create --name EXPO_PUBLIC_GOOGLE_DIRECTIONS_API_KEY --value "..." --scope project`
+- `eas secret:create --name EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY --value "..." --scope project`
+
+Then build with `eas build --profile development --platform android`.
