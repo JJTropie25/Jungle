@@ -1,5 +1,4 @@
 import { Redirect } from "expo-router";
-import { View } from "react-native";
 import { useAuthState } from "../lib/auth";
 import { useOnboardingState } from "../lib/onboarding";
 import SplashScreen from "../components/SplashScreen";

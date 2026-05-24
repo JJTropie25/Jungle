@@ -6,6 +6,7 @@ const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
 const stripeWebhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
 const stripeWebhookSecretConnect =
   Deno.env.get("STRIPE_WEBHOOK_SECRET_CONNECT") ?? "";
+const stripeApiVersion = "2023-10-16";
 
 function toUint8Array(input: string) {
   return new TextEncoder().encode(input);
@@ -82,20 +83,46 @@ serve(async (req) => {
     auth: { persistSession: false },
   });
 
+  async function refreshHostStripeStatus(accountId: string) {
+    // Always fetch canonical account state from Stripe before updating host flags.
+    const accountRes = await fetch(`https://api.stripe.com/v1/accounts/${accountId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${stripeSecretKey}`,
+        "Stripe-Version": stripeApiVersion,
+      },
+    });
+    if (!accountRes.ok) {
+      const body = await accountRes.text();
+      console.error("stripe account fetch failed", accountRes.status, body);
+      return;
+    }
+    const account = await accountRes.json();
+    await adminClient
+      .from("hosts")
+      .update({
+        stripe_charges_enabled: account?.charges_enabled ?? false,
+        stripe_payouts_enabled: account?.payouts_enabled ?? false,
+        stripe_details_submitted: account?.details_submitted ?? false,
+        stripe_onboarding_complete:
+          Boolean(account?.charges_enabled) && Boolean(account?.payouts_enabled),
+        stripe_onboarding_at: new Date().toISOString(),
+      })
+      .eq("stripe_account_id", accountId);
+  }
+
   if (event.type === "account.updated") {
     const account = event.data.object;
     if (account?.id) {
-      await adminClient
-        .from("hosts")
-        .update({
-          stripe_charges_enabled: account.charges_enabled ?? false,
-          stripe_payouts_enabled: account.payouts_enabled ?? false,
-          stripe_details_submitted: account.details_submitted ?? false,
-          stripe_onboarding_complete:
-            Boolean(account.charges_enabled) && Boolean(account.payouts_enabled),
-          stripe_onboarding_at: new Date().toISOString(),
-        })
-        .eq("stripe_account_id", account.id);
+      await refreshHostStripeStatus(account.id);
+    }
+  }
+
+  if (typeof event.type === "string" && event.type.startsWith("v2.core.account")) {
+    // Connect v2 events use a different envelope; derive account id from related_object/changes.
+    const accountId = event?.related_object?.id ?? event?.changes?.after?.id;
+    if (typeof accountId === "string" && accountId.startsWith("acct_")) {
+      await refreshHostStripeStatus(accountId);
     }
   }
 

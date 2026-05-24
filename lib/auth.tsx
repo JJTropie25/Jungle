@@ -20,11 +20,29 @@ export function useAuthState(): AuthState {
       return;
     }
 
+    const ensureProfile = async (nextUser: User | null) => {
+      if (!supabase || !nextUser) return;
+      // Keep public.profiles aligned with auth.users so host FK constraints never fail.
+      const username =
+        (nextUser.user_metadata?.username as string | undefined) ??
+        (nextUser.user_metadata?.name as string | undefined) ??
+        (nextUser.email?.split("@")[0] ?? null);
+      await supabase.from("profiles").upsert(
+        {
+          id: nextUser.id,
+          username,
+        },
+        { onConflict: "id" }
+      );
+    };
+
     const hydrateSession = async () => {
+      // Hydrate once at boot so screens can render immediately with cached auth state.
       const { data } = await supabase.auth.getSession();
       if (!isMounted) return;
       setSession(data.session ?? null);
       setUser(data.session?.user ?? null);
+      await ensureProfile(data.session?.user ?? null);
       setLoading(false);
     };
 
@@ -38,6 +56,7 @@ export function useAuthState(): AuthState {
         if (!isMounted) return;
         setSession(nextSession);
         setUser(nextSession?.user ?? null);
+        ensureProfile(nextSession?.user ?? null).catch(() => null);
       }
     );
 

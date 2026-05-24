@@ -14,8 +14,8 @@ import { useAuthState } from "../../../lib/auth";
 import { supabase } from "../../../lib/supabase";
 import { colors } from "../../../lib/theme";
 import { useAppDialog } from "../../../components/AppDialogProvider";
-import { useStripe } from "@stripe/stripe-react-native";
 import { createPaymentIntent } from "../../../lib/stripe";
+import { useStripeClient } from "../../../lib/useStripeClient";
 
 export default function Payment() {
   const router = useRouter();
@@ -23,7 +23,7 @@ export default function Payment() {
   const { t } = useI18n();
   const { user } = useAuthState();
   const dialog = useAppDialog();
-  const stripe = useStripe();
+  const stripe = useStripeClient();
   const {
     serviceId,
     slotStart,
@@ -91,6 +91,12 @@ export default function Payment() {
     let platformFeeCents: number | null = null;
 
     if (method === "card") {
+      if (!stripe) {
+        setProcessing(false);
+        await dialog.alert(t("payment.title"), t("payment.cardNotAvailableWeb"));
+        return;
+      }
+      // Price and platform fee are computed server-side in Stripe function.
       const paymentIntent = await createPaymentIntent({
         service_id: serviceId,
         slot_start: slotStart,
@@ -129,6 +135,7 @@ export default function Payment() {
     }
 
     const qrToken = `BK-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    // Persist booking only after card confirmation (or immediately for cash method).
     const { data, error } = await supabase
       .from("bookings")
       .insert({
@@ -342,3 +349,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
+
+
+

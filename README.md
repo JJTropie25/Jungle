@@ -1,71 +1,93 @@
-# Welcome to your Expo app 👋
+# Lagoon App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo + Supabase app with guest/host flows, maps, notifications, and Stripe Connect payments.
 
-## Get started
+## Prerequisites
 
-1. Install dependencies
+- Node.js 20+
+- npm
+- Expo CLI (`npx expo`)
+- Supabase project
+- Stripe account (test mode for setup)
 
-   ```bash
-   npm install
-   ```
+## Local setup
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+1. Install deps:
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. Create `.env` from `.env.example` and fill values:
 
-## Learn more
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- Maps keys (`EXPO_PUBLIC_GOOGLE_*`) if you use maps/search
 
-To learn more about developing your project with Expo, look at the following resources:
+3. (Android push) put `google-services.json` in project root.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+4. Start app:
 
-## Join the community
+```bash
+npx expo start
+```
 
-Join our community of developers creating universal apps.
+## Stripe integration status
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Implemented in repo:
 
-## Local setup (secrets)
+- Guest payment sheet (native): `app/(tabs)/guest/Payment.tsx`
+- Web fallback (card disabled): `lib/useStripeClient.web.ts`
+- Host onboarding UI: `app/(host)/profile.tsx`
+- Supabase Edge Functions:
+  - `stripe-create-connected-account`
+  - `stripe-create-account-link`
+  - `stripe-create-payment-intent`
+  - `stripe-webhook`
+  - `stripe-return`
+- DB migration: `supabase/migrations/20260403090000_stripe_connect.sql`
 
-Create a local `.env` from `.env.example` and fill in keys.
+## What must be configured outside the app
 
-For Android FCM (push notifications), download `google-services.json` from Firebase Console:
-Project settings -> Your apps -> Android -> Download config.
-Place it at the project root as `google-services.json`.
+### 1) Supabase secrets for Edge Functions
 
-These files are intentionally git-ignored.
+Set these in Supabase project secrets:
 
-### EAS build secrets
-Do not put API keys in `eas.json`. Instead set them in EAS:
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- Optional: `STRIPE_WEBHOOK_SECRET_CONNECT`
+- Optional: `PLATFORM_FEE_PERCENT` (default 20)
 
-- `eas secret:create --name EXPO_PUBLIC_GOOGLE_MAPS_API_KEY --value "..." --scope project`
-- `eas secret:create --name EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY --value "..." --scope project`
-- `eas secret:create --name EXPO_PUBLIC_GOOGLE_PLACES_API_KEY --value "..." --scope project`
-- `eas secret:create --name EXPO_PUBLIC_GOOGLE_DIRECTIONS_API_KEY --value "..." --scope project`
-- `eas secret:create --name EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY --value "..." --scope project`
+### 2) Deploy functions
 
-Then build with `eas build --profile development --platform android`.
+Deploy all Stripe functions to Supabase.
+
+### 3) Stripe webhooks
+
+Create webhook endpoint for your deployed `stripe-webhook` function and subscribe at least to:
+
+- `account.updated`
+- `payment_intent.succeeded`
+- `payment_intent.payment_failed`
+
+Copy webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+### 4) Expo/EAS public env
+
+Set `EXPO_PUBLIC_*` variables for builds (do not store keys in `eas.json`).
+
+## Quick verification flow
+
+1. Host opens profile and activates payments (Stripe onboarding).
+2. Guest books and pays by card.
+3. Booking row stores `payment_intent_id` and status updates to `paid`.
+4. Webhook updates payment status for success/failure events.
+
+## Notes
+
+- Card payments are intentionally disabled on web in current implementation.
+- Keep `.env` and credentials out of git.

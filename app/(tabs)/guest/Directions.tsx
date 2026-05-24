@@ -4,8 +4,9 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "../../../lib/theme";
 import { useEffect, useMemo, useRef, useState } from "react";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import { useI18n } from "../../../lib/i18n";
 import * as Location from "expo-location";
+import DirectionsMap from "../../../components/DirectionsMap";
 
 type Params = {
   microservice?: string;
@@ -79,8 +80,9 @@ export default function Directions() {
     latitude,
     longitude,
   } = useLocalSearchParams<Params>();
+  const { t } = useI18n();
 
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
   const [origin, setOrigin] = useState<LatLng | null>(null);
   const [route, setRoute] = useState<LatLng[]>([]);
 
@@ -126,7 +128,7 @@ export default function Directions() {
       if (!res.ok) return;
       const payload = (await res.json()) as {
         status?: string;
-        routes?: Array<{ overview_polyline?: { points?: string } }>;
+        routes?: { overview_polyline?: { points?: string } }[];
       };
       if (!mounted) return;
       if (payload.status !== "OK") {
@@ -158,31 +160,29 @@ export default function Directions() {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.mapContainer}>
-        <MapView ref={mapRef} style={styles.map} initialRegion={{
-          latitude: destinationCoords.latitude,
-          longitude: destinationCoords.longitude,
-          latitudeDelta: 0.4,
-          longitudeDelta: 0.4,
-        }}>
-          {origin ? (
-            <Marker coordinate={origin} title="You" pinColor={colors.warmAccentDark} />
-          ) : null}
-          <Marker
-            coordinate={destinationCoords}
-            title={microservice ?? "Service"}
-            description={destination ?? ""}
-          />
-          {route.length > 1 ? (
-            <Polyline coordinates={route} strokeWidth={4} strokeColor={colors.accent} />
-          ) : null}
-        </MapView>
+        <DirectionsMap
+          mapRef={mapRef}
+          destinationCoords={destinationCoords}
+          origin={origin}
+          route={route}
+          microservice={microservice}
+          destination={destination}
+          title={t("directions.webTitle")}
+          body={t("directions.webBody")}
+          back={t("directions.webBack")}
+          onBack={() => router.back()}
+        />
         <View style={[styles.mapTop, { paddingTop: insets.top + 12 }]}>
           <View style={styles.summaryBox}>
             <TouchableOpacity
               style={styles.summaryBack}
               onPress={() => router.back()}
             >
-              <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textPrimary} />
+              <MaterialCommunityIcons
+                name="arrow-left"
+                size={20}
+                color={colors.textPrimary}
+              />
             </TouchableOpacity>
             <View style={styles.summaryLine}>
               <Text style={styles.summaryItem}>{microservice ?? "-"}</Text>
@@ -192,7 +192,11 @@ export default function Directions() {
               <Text style={styles.summaryItem}>{timeslot ?? "-"}</Text>
               <Text style={styles.summarySep}>|</Text>
               <View style={styles.summaryPeople}>
-                <MaterialCommunityIcons name="account-group" size={16} color={colors.textPrimary} />
+                <MaterialCommunityIcons
+                  name="account-group"
+                  size={16}
+                  color={colors.textPrimary}
+                />
                 <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
               </View>
             </View>
@@ -206,7 +210,6 @@ export default function Directions() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.screenBackground },
   mapContainer: { flex: 1 },
-  map: { flex: 1 },
   mapTop: {
     position: "absolute",
     top: 0,

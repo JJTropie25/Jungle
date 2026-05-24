@@ -13,7 +13,6 @@
       "supportsTablet": true
     },
     "android": {
-      "googleServicesFile": "./google-services.json",
       "package": "com.lagoon.app",
       "adaptiveIcon": {
         "backgroundColor": "#388c4a",
@@ -26,11 +25,6 @@
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "3ac596aa-bd3a-4534-ab7e-88d020cbde7c"
-      }
     },
     "plugins": [
       "expo-router",

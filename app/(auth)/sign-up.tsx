@@ -32,7 +32,8 @@ const [password, setPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [prefixOpen, setPrefixOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | "apple" | null>(null);
+  const showApple = Platform.OS === "ios";
   const PREFIX_OPTIONS = ["+39", "+33", "+34", "+44", "+49", "+1"];
 
   useEffect(() => {
@@ -107,7 +108,7 @@ const [password, setPassword] = useState("");
     router.replace("/(auth)/sign-in");
   };
 
-  const handleOAuth = async (provider: "google" | "facebook") => {
+  const handleOAuth = async (provider: "google" | "facebook" | "apple") => {
     if (!supabase) {
       await dialog.alert(
         t("auth.signUpTitle"),
@@ -123,6 +124,7 @@ const [password, setPassword] = useState("");
         (Constants.manifest as any)?.debuggerHost;
       const isExpoGo = Constants.appOwnership === "expo";
       let redirectTo = Linking.createURL("/auth-callback");
+      // Expo Go needs /--/ segment for deep links to resolve back into the app.
       if (isExpoGo) {
         if (
           redirectTo.startsWith("http") ||
@@ -170,9 +172,7 @@ const [password, setPassword] = useState("");
         return;
       }
 
-      console.log("OAuth authUrl", data.url);
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-      console.log("OAuth result", result);
       if (result.type !== "success" || !result.url) return;
 
       const parsed = Linking.parse(result.url);
@@ -214,10 +214,20 @@ const [password, setPassword] = useState("");
 
   return (
     <View style={styles.container}>
+      <View style={styles.glowTop} />
+      <View style={styles.glowBottom} />
       <Text style={styles.title}>{t("auth.signUpTitle")}</Text>
       <Text style={styles.subtitle}>{t("auth.signUpSubtitle")}</Text>
 
       <View style={styles.socialRow}>
+        {showApple ? <Pressable
+          style={[styles.socialButton, oauthLoading === "apple" && styles.disabled]}
+          onPress={() => handleOAuth("apple")}
+          disabled={oauthLoading === "apple"}
+        >
+          <MaterialCommunityIcons name="apple" size={18} color={colors.textPrimary} />
+          <Text style={styles.socialText}>{t("auth.continueWithApple")}</Text>
+        </Pressable> : null}
         <Pressable
           style={[styles.socialButton, oauthLoading === "google" && styles.disabled]}
           onPress={() => handleOAuth("google")}
@@ -324,6 +334,33 @@ const styles = StyleSheet.create({
     backgroundColor: colors.screenBackground,
     paddingHorizontal: 24,
     paddingTop: 80,
+    overflow: "hidden",
+  },
+  glowTop: {
+    position: "absolute",
+    top: -80,
+    right: -40,
+    width: 220,
+    height: 220,
+    borderTopLeftRadius: 120,
+    borderTopRightRadius: 80,
+    borderBottomLeftRadius: 90,
+    borderBottomRightRadius: 130,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    transform: [{ rotate: "18deg" }],
+  },
+  glowBottom: {
+    position: "absolute",
+    bottom: -100,
+    left: -50,
+    width: 260,
+    height: 260,
+    borderTopLeftRadius: 150,
+    borderTopRightRadius: 95,
+    borderBottomLeftRadius: 110,
+    borderBottomRightRadius: 170,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    transform: [{ rotate: "-14deg" }],
   },
   title: {
     fontSize: 24,
@@ -344,7 +381,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(226,242,242,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 12,
@@ -366,7 +405,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(226,242,242,0.96)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
     color: colors.textPrimary,
     fontSize: 16,
     fontWeight: "700",
@@ -386,7 +427,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: Platform.OS === "web" ? 13 : 12,
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(226,242,242,0.96)",
     width: 88,
     alignItems: "center",
   },
@@ -432,7 +473,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   modalCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(226,242,242,0.96)",
     borderRadius: 12,
     padding: 12,
     gap: 8,

@@ -78,6 +78,7 @@ export default function HostProfile() {
   const handleActivatePayments = async () => {
     if (!user) return;
     setActivating(true);
+    // Ensure host has (or reuses) a connected account before generating onboarding link.
     const created = await createConnectedAccount();
     if (created.error) {
       setActivating(false);

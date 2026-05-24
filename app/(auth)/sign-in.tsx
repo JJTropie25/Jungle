@@ -27,7 +27,8 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "facebook" | "apple" | null>(null);
+  const showApple = Platform.OS === "ios";
 
   useEffect(() => {
     if (!supabase) return;
@@ -96,7 +97,7 @@ export default function SignIn() {
     await dialog.alert(t("auth.resetPasswordTitle"), t("auth.resetPasswordSent"));
   };
 
-  const handleOAuth = async (provider: "google" | "facebook") => {
+  const handleOAuth = async (provider: "google" | "facebook" | "apple") => {
     if (!supabase) {
       await dialog.alert(
         t("auth.signInTitle"),
@@ -112,6 +113,7 @@ export default function SignIn() {
         (Constants.manifest as any)?.debuggerHost;
       const isExpoGo = Constants.appOwnership === "expo";
       let redirectTo = Linking.createURL("/auth-callback");
+      // Expo Go needs /--/ segment for deep links to resolve back into the app.
       if (isExpoGo) {
         if (
           redirectTo.startsWith("http") ||
@@ -159,9 +161,7 @@ export default function SignIn() {
         return;
       }
 
-      console.log("OAuth authUrl", data.url);
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-      console.log("OAuth result", result);
       if (result.type !== "success" || !result.url) return;
 
       const parsed = Linking.parse(result.url);
@@ -203,10 +203,22 @@ export default function SignIn() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.glowTop} />
+      <View style={styles.glowBottom} />
       <Text style={styles.title}>{t("auth.signInTitle")}</Text>
       <Text style={styles.subtitle}>{t("auth.signInSubtitle")}</Text>
 
       <View style={styles.socialRow}>
+        {showApple ? <Pressable
+          style={[styles.socialButton, oauthLoading === "apple" && styles.disabled]}
+          onPress={() => handleOAuth("apple")}
+          disabled={oauthLoading === "apple"}
+        >
+          <MaterialCommunityIcons name="apple" size={18} color={colors.textPrimary} />
+          <Text style={styles.socialText}>
+            {t("auth.continueWithApple")}
+          </Text>
+        </Pressable> : null}
         <Pressable
           style={[styles.socialButton, oauthLoading === "google" && styles.disabled]}
           onPress={() => handleOAuth("google")}
@@ -287,6 +299,33 @@ const styles = StyleSheet.create({
     backgroundColor: colors.screenBackground,
     paddingHorizontal: 24,
     paddingTop: 80,
+    overflow: "hidden",
+  },
+  glowTop: {
+    position: "absolute",
+    top: -80,
+    right: -40,
+    width: 220,
+    height: 220,
+    borderTopLeftRadius: 120,
+    borderTopRightRadius: 80,
+    borderBottomLeftRadius: 90,
+    borderBottomRightRadius: 130,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    transform: [{ rotate: "18deg" }],
+  },
+  glowBottom: {
+    position: "absolute",
+    bottom: -100,
+    left: -50,
+    width: 260,
+    height: 260,
+    borderTopLeftRadius: 150,
+    borderTopRightRadius: 95,
+    borderBottomLeftRadius: 110,
+    borderBottomRightRadius: 170,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    transform: [{ rotate: "-14deg" }],
   },
   title: {
     fontSize: 24,
@@ -307,7 +346,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(226,242,242,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 12,
@@ -329,7 +370,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(226,242,242,0.96)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
     color: colors.textPrimary,
     fontSize: 16,
     fontWeight: "700",

@@ -18,6 +18,7 @@ export default function AuthCallback() {
     }
 
     const exchange = async () => {
+      // If auth state is already present, callback page can exit immediately.
       const { data: existing } = await supabase.auth.getSession();
       if (existing.session) {
         router.replace("/(tabs)/guest");
@@ -25,6 +26,7 @@ export default function AuthCallback() {
       }
 
       const handleUrl = async (urlString: string) => {
+        // Supabase can return either OAuth code flow or hash tokens depending on provider/runtime.
         const errorDescription = (() => {
           const parsed = Linking.parse(urlString);
           const err =
@@ -89,6 +91,7 @@ export default function AuthCallback() {
 
       let resolved = false;
       const tryWaitForSession = async () => {
+        // Some providers complete in background and persist session without URL callback event.
         for (let i = 0; i < 6; i += 1) {
           const { data } = await supabase.auth.getSession();
           if (data.session) {

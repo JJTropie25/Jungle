@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -19,9 +19,35 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   NotificationRow,
+  registerForPushNotifications,
 } from "../lib/notifications";
-import { registerForPushNotifications } from "../lib/notifications";
 import * as Notifications from "expo-notifications";
+
+function humanizeEtaMinutes(totalMinutes: number): string {
+  const minutes = Math.max(0, Math.floor(totalMinutes));
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} day${days === 1 ? "" : "s"}`);
+  if (hours > 0) parts.push(`${hours} h`);
+  if (mins > 0 || parts.length === 0) parts.push(`${mins} min`);
+  return parts.join(" ");
+}
+
+function normalizeNotificationBody(body: string | null, data: any | null): string | null {
+  if (!body) return body;
+  const etaRaw = Number(data?.eta_minutes);
+  if (Number.isFinite(etaRaw)) {
+    return `New guest arrives in ${humanizeEtaMinutes(etaRaw)}`;
+  }
+  const match = body.match(/New guest arrives in\s+(\d+)\s+min/i);
+  if (!match) return body;
+  const parsed = Number(match[1]);
+  if (!Number.isFinite(parsed)) return body;
+  return `New guest arrives in ${humanizeEtaMinutes(parsed)}`;
+}
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -32,7 +58,7 @@ export default function NotificationsScreen() {
   const [needsPermission, setNeedsPermission] = useState(false);
   const [registering, setRegistering] = useState(false);
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!user?.id) {
       setItems([]);
       setLoading(false);
@@ -42,11 +68,12 @@ export default function NotificationsScreen() {
     const data = await fetchNotifications(user.id);
     setItems(data);
     setLoading(false);
-  };
+  }, [user?.id]);
 
   useEffect(() => {
+    // Reload list when user changes; manual refresh handles read state updates.
     loadNotifications().catch(() => setLoading(false));
-  }, [user?.id]);
+  }, [loadNotifications]);
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -120,6 +147,7 @@ export default function NotificationsScreen() {
             contentContainerStyle={styles.listContent}
             renderItem={({ item }) => {
               const unread = !item.read_at;
+              const body = normalizeNotificationBody(item.body, item.data);
               return (
                 <Pressable
                   style={[styles.row, unread && styles.rowUnread]}
@@ -132,8 +160,8 @@ export default function NotificationsScreen() {
                 >
                   <View style={styles.rowInner}>
                     <Text style={styles.cardTitle}>{item.title}</Text>
-                    {item.body ? (
-                      <Text style={styles.cardBody}>{item.body}</Text>
+                    {body ? (
+                      <Text style={styles.cardBody}>{body}</Text>
                     ) : null}
                     <Text style={styles.cardTime}>
                       {new Date(item.created_at).toLocaleString()}
@@ -214,15 +242,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 24,
-  },
-  rowInner: {
-    gap: 6,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: "rgba(226,242,242,0.35)",
-    marginLeft: 16,
-    marginRight: 16,
   },
   cardTitle: {
     fontWeight: "700",

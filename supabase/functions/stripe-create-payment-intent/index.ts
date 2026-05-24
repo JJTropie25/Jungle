@@ -30,6 +30,7 @@ serve(async (req) => {
       return new Response("Missing Supabase or Stripe secrets", { status: 500 });
     }
 
+  // User JWT is validated via anon client; privileged DB reads happen through service-role client.
   const authHeader = req.headers.get("Authorization") ?? "";
   const userClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
@@ -74,6 +75,7 @@ serve(async (req) => {
     const feePct = Number.isFinite(platformFeePct) ? platformFeePct : 20;
     const platformFee = Math.round(amountCents * (feePct / 100));
 
+    // Destination charge with application fee: funds go to host, platform keeps fee.
     const intent = await stripePost("payment_intents", {
       amount: String(amountCents),
       currency,

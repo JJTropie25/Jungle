@@ -5,6 +5,7 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 
 async function getAccessToken(): Promise<string | null> {
   if (!supabase) return null;
+  // Edge Functions are protected by JWT; reuse the current Supabase session token.
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? null;
 }
@@ -37,6 +38,7 @@ export async function createAccountLink(returnUrl: string, refreshUrl: string): 
 
 export function getStripeReturnUrl(path: string): string | null {
   if (!supabaseUrl) return null;
+  // Stripe onboarding returns to Supabase function, which then redirects into app deep-link.
   const redirect = encodeURIComponent(Linking.createURL(path));
   return `${supabaseUrl}/functions/v1/stripe-return?redirect=${redirect}`;
 }

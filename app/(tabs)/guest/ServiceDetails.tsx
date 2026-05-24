@@ -36,7 +36,7 @@ export default function ServiceDetails() {
     }>();
 
   const [slots, setSlots] = useState<{ id: string; time: string; start: string; end: string }[]>([]);
-  const [loadingSlots, setLoadingSlots] = useState(true);
+  const [, setLoadingSlots] = useState(true);
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [serviceTitle, setServiceTitle] = useState<string | null>(null);

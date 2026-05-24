@@ -8,20 +8,17 @@ import { useFonts } from "expo-font";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import SplashScreen from "../components/SplashScreen";
 import NotificationsProvider from "../components/NotificationsProvider";
-import { StripeProvider } from "@stripe/stripe-react-native";
+import StripeRootProvider from "../components/StripeRootProvider";
 
 export default function RootLayout() {
   useAuthState();
   const [fontsLoaded] = useFonts({
     ...MaterialCommunityIcons.font,
   });
-  const stripePublishableKey =
-    process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
 
   if (!fontsLoaded) return <SplashScreen />;
 
-  return (
-    <StripeProvider publishableKey={stripePublishableKey} merchantIdentifier="merchant.com.lagoon">
+  const Content = (
       <I18nProvider>
         <AppDialogProvider>
           <NotificationsProvider />
@@ -50,8 +47,8 @@ export default function RootLayout() {
           </View>
         </AppDialogProvider>
       </I18nProvider>
-    </StripeProvider>
   );
+  return <StripeRootProvider>{Content}</StripeRootProvider>;
 }
 
 const styles = StyleSheet.create({

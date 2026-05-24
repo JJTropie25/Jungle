@@ -23,8 +23,12 @@ async function googleGeocodeSearch(query: string, limit: number): Promise<PlaceS
       geometry?: { location?: { lat?: number; lng?: number } };
     }>;
     status?: string;
+    error_message?: string;
   };
-  if (payload.status && payload.status !== "OK") return [];
+  if (payload.status && payload.status !== "OK") {
+    console.warn("Google Geocoding status", payload.status, payload.error_message ?? "");
+    return [];
+  }
   if (!Array.isArray(payload.results)) return [];
   return payload.results
     .slice(0, Math.max(1, Math.min(limit, 10)))
@@ -52,9 +56,13 @@ async function googlePlacesAutocomplete(
   if (!res.ok) return [];
   const payload = (await res.json()) as {
     status?: string;
+    error_message?: string;
     predictions?: Array<{ description?: string; place_id?: string }>;
   };
-  if (payload.status !== "OK" || !Array.isArray(payload.predictions)) return [];
+  if (payload.status !== "OK" || !Array.isArray(payload.predictions)) {
+    console.warn("Google Places autocomplete status", payload.status, payload.error_message ?? "");
+    return [];
+  }
 
   const sliced = payload.predictions.slice(0, Math.max(1, Math.min(limit, 10)));
   const details = await Promise.all(
@@ -72,12 +80,16 @@ async function googlePlacesAutocomplete(
       if (!detailsRes.ok) return null;
       const detailsPayload = (await detailsRes.json()) as {
         status?: string;
+        error_message?: string;
         result?: {
           formatted_address?: string;
           geometry?: { location?: { lat?: number; lng?: number } };
         };
       };
-      if (detailsPayload.status !== "OK") return null;
+      if (detailsPayload.status !== "OK") {
+        console.warn("Google Places details status", detailsPayload.status, detailsPayload.error_message ?? "");
+        return null;
+      }
       const label =
         detailsPayload.result?.formatted_address?.trim() ??
         prediction.description?.trim();
@@ -120,7 +132,12 @@ async function googleReverse(latitude: number, longitude: number): Promise<strin
   if (!res.ok) return null;
   const payload = (await res.json()) as {
     results?: Array<{ formatted_address?: string }>;
+    status?: string;
+    error_message?: string;
   };
+  if (payload.status && payload.status !== "OK") {
+    console.warn("Google reverse geocoding status", payload.status, payload.error_message ?? "");
+  }
   return payload.results?.[0]?.formatted_address?.trim() || null;
 }
 

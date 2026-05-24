@@ -58,7 +58,7 @@ export default function SearchResults() {
     }>();
 
   const [services, setServices] = useState<Service[]>([]);
-  const [loadingServices, setLoadingServices] = useState(true);
+  const [, setLoadingServices] = useState(true);
 
   useEffect(() => {
     let isMounted = true;

@@ -30,7 +30,6 @@ import {
 import { useAuthState } from "../../../lib/auth";
 import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favorites";
 import { getRecentlyViewedIds } from "../../../lib/recentlyViewed";
-import { acceptPolicy } from "../../../lib/policy";
 import { PlaceSuggestion, searchPlaceSuggestions } from "../../../lib/geocoding";
 
 export default function GuestHome() {
@@ -44,7 +43,7 @@ export default function GuestHome() {
   const [time, setTime] = useState("");
   const [people, setPeople] = useState("");
   const [microservice, setMicroservice] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [destinationCoords, setDestinationCoords] = useState<{
     latitude: number;
