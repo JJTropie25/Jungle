@@ -91,3 +91,27 @@ Set `EXPO_PUBLIC_*` variables for builds (do not store keys in `eas.json`).
 
 - Card payments are intentionally disabled on web in current implementation.
 - Keep `.env` and credentials out of git.
+
+## Facebook Login setup (Supabase + Meta)
+
+Code support is already wired in:
+
+- `app/(auth)/sign-in.tsx`
+- `app/(auth)/sign-up.tsx`
+- `app/auth-callback.tsx`
+
+To enable Facebook auth end-to-end:
+
+1. Create a Meta app (Meta for Developers) and add **Facebook Login** product.
+2. Copy `App ID` and `App Secret`.
+3. In Supabase Dashboard -> Auth -> Providers -> Facebook:
+   - Enable provider
+   - Paste `App ID` and `App Secret`
+   - Copy the Supabase callback URL shown there.
+4. In Meta Dashboard -> Facebook Login -> Settings:
+   - Add Supabase callback URL to **Valid OAuth Redirect URIs**.
+5. In Supabase Auth URL config, ensure your app redirect URL(s) are allowed (including deep-link callback path).
+6. Test from app:
+   - Tap `Continue with Facebook`
+   - Complete OAuth
+   - Verify redirect to guest home and session persisted.
