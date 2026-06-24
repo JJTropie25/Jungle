@@ -10,7 +10,8 @@ import {
   ViewStyle,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { colors } from "../lib/theme";
+import { useTheme } from "../lib/theme-context";
+import { type ThemeColors } from "../lib/theme";
 
 type Props = {
   placeholder: string;
@@ -21,6 +22,109 @@ type Props = {
   fieldStyle?: ViewStyle;
 };
 
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    field: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 8,
+      padding: 12,
+      backgroundColor: c.background,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    label: {
+      color: c.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    placeholder: {
+      color: c.textMuted,
+      fontWeight: "600",
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.4)",
+      padding: 24,
+      justifyContent: "center",
+    },
+    modalCard: {
+      backgroundColor: c.background,
+      borderRadius: 12,
+      padding: 14,
+      alignSelf: "center",
+    },
+    selector: {
+      width: 96,
+      height: 156,
+      borderRadius: 10,
+      overflow: "hidden",
+      position: "relative",
+      backgroundColor: c.background,
+    },
+    wheel: {
+      flex: 1,
+      zIndex: 2,
+    },
+    wheelContent: {
+      paddingVertical: 52,
+    },
+    row: {
+      height: 52,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "transparent",
+      zIndex: 3,
+    },
+    rowSelected: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: 52,
+      height: 52,
+      backgroundColor: c.surfaceSoft,
+      borderRadius: 10,
+      opacity: 1,
+      zIndex: 1,
+    },
+    rowText: {
+      color: "#111111",
+      fontWeight: "600",
+    },
+    done: {
+      marginTop: 12,
+      alignSelf: "flex-end",
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      backgroundColor: c.textPrimary,
+      borderRadius: 8,
+    },
+    doneText: {
+      color: c.background,
+      fontWeight: "600",
+    },
+    webSelect: {
+      borderWidth: 0,
+      outlineWidth: 0,
+      flex: 1,
+      paddingVertical: 0,
+      paddingHorizontal: 0,
+      backgroundColor: "transparent",
+      color: c.textPrimary,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    webSelectWrap: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+  });
+}
+
 export default function UIWheelSelectField({
   placeholder,
   value,
@@ -29,6 +133,8 @@ export default function UIWheelSelectField({
   onChange,
   fieldStyle,
 }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
   const [draftValue, setDraftValue] = useState("");
   const wheelRef = useRef<ScrollView>(null);
@@ -152,104 +258,3 @@ export default function UIWheelSelectField({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  field: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: colors.background,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  label: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  placeholder: {
-    color: colors.textMuted,
-    fontWeight: "700",
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    padding: 24,
-    justifyContent: "center",
-  },
-  modalCard: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 14,
-    alignSelf: "center",
-  },
-  selector: {
-    width: 96,
-    height: 156,
-    borderRadius: 10,
-    overflow: "hidden",
-    position: "relative",
-    backgroundColor: colors.background,
-  },
-  wheel: {
-    flex: 1,
-    zIndex: 2,
-  },
-  wheelContent: {
-    paddingVertical: 52,
-  },
-  row: {
-    height: 52,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-    zIndex: 3,
-  },
-  rowSelected: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 52,
-    height: 52,
-    backgroundColor: colors.surfaceSoft,
-    borderRadius: 10,
-    opacity: 1,
-    zIndex: 1,
-  },
-  rowText: {
-    color: "#111111",
-    fontWeight: "600",
-  },
-  done: {
-    marginTop: 12,
-    alignSelf: "flex-end",
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    backgroundColor: colors.textPrimary,
-    borderRadius: 8,
-  },
-  doneText: {
-    color: colors.background,
-    fontWeight: "600",
-  },
-  webSelect: {
-    borderWidth: 0,
-    outlineWidth: 0,
-    flex: 1,
-    paddingVertical: 0,
-    paddingHorizontal: 0,
-    backgroundColor: "transparent",
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  webSelectWrap: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-});

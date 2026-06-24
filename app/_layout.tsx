@@ -6,19 +6,23 @@ import { LinearGradient } from "expo-linear-gradient";
 import { AppDialogProvider } from "../components/AppDialogProvider";
 import { useFonts } from "expo-font";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Baloo2_700Bold } from "@expo-google-fonts/baloo-2";
 import SplashScreen from "../components/SplashScreen";
 import NotificationsProvider from "../components/NotificationsProvider";
 import StripeRootProvider from "../components/StripeRootProvider";
+import { ThemeProvider } from "../lib/theme-context";
 
 export default function RootLayout() {
   useAuthState();
   const [fontsLoaded] = useFonts({
     ...MaterialCommunityIcons.font,
+    Baloo2_700Bold,
   });
 
   if (!fontsLoaded) return <SplashScreen />;
 
   const Content = (
+      <ThemeProvider>
       <I18nProvider>
         <AppDialogProvider>
           <NotificationsProvider />
@@ -31,7 +35,7 @@ export default function RootLayout() {
               style={StyleSheet.absoluteFill}
             />
 
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0B3F3F" } }} />
+            <Stack screenOptions={{ headerShown: false, animation: "slide_from_right", contentStyle: { backgroundColor: "#0B3F3F" } }} />
             <LinearGradient
               colors={[
                 "rgba(11,63,63,0)",
@@ -47,6 +51,7 @@ export default function RootLayout() {
           </View>
         </AppDialogProvider>
       </I18nProvider>
+      </ThemeProvider>
   );
   return <StripeRootProvider>{Content}</StripeRootProvider>;
 }

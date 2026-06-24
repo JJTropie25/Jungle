@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
-import { colors } from "../lib/theme";
+import { useTheme } from "../lib/theme-context";
 
 type Props = {
   minimumValue?: number;
@@ -19,10 +19,12 @@ export default function UISlider({
   step = 1,
   value = 0,
   onValueChange,
-  minimumTrackTintColor = colors.textPrimary,
+  minimumTrackTintColor,
   onSlidingStart,
   onSlidingComplete,
 }: Props) {
+  const { colors } = useTheme();
+  const resolvedTrackColor = minimumTrackTintColor ?? colors.textPrimary;
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -33,7 +35,6 @@ export default function UISlider({
 
   return (
     <View>
-      {/* @ts-expect-error web-only input */}
       <input
         ref={inputRef}
         type="range"
@@ -59,7 +60,7 @@ export default function UISlider({
         }}
         style={{
           width: "100%",
-          accentColor: minimumTrackTintColor,
+          accentColor: resolvedTrackColor,
           touchAction: "none",
         }}
       />

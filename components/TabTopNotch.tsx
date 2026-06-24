@@ -1,21 +1,70 @@
 import { AppState, Image, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { useAuthState } from "../lib/auth";
 import { supabase } from "../lib/supabase";
-import { colors } from "../lib/theme";
 import { useFocusEffect } from "@react-navigation/native";
+import { useTheme } from "../lib/theme-context";
+import { type ThemeColors } from "../lib/theme";
 
 type TabTopNotchProps = {
   hideBell?: boolean;
 };
 
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    fixedNotch: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      height: 48,
+      backgroundColor: "#4F9B9B",
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "flex-start",
+      paddingLeft: 14,
+      zIndex: 50,
+      shadowColor: "#000",
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 8,
+    },
+    notchLogo: {
+      width: 110,
+      height: 30,
+      marginTop: -1,
+      marginLeft: -4,
+    },
+    bellButton: {
+      position: "absolute",
+      right: 14,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    badgeDot: {
+      position: "absolute",
+      top: 7,
+      right: 7,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: c.warmAccent,
+    },
+  });
+}
+
 export default function TabTopNotch({ hideBell }: TabTopNotchProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthState();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [unreadCount, setUnreadCount] = useState(0);
   const logo = require("../assets/images/Lagoon_notch.png");
 
@@ -24,7 +73,8 @@ export default function TabTopNotch({ hideBell }: TabTopNotchProps) {
       setUnreadCount(0);
       return;
     }
-    const { count } = await supabase
+    const sb = supabase;
+    const { count } = await sb
       .from("notifications")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user.id)
@@ -40,9 +90,10 @@ export default function TabTopNotch({ hideBell }: TabTopNotchProps) {
 
   useEffect(() => {
     if (!supabase || !user?.id) return;
+    const sb = supabase;
     loadCount().catch(() => null);
 
-    const channel = supabase
+    const channel = sb
       .channel(`notifications:${user.id}`)
       .on(
         "postgres_changes",
@@ -57,7 +108,7 @@ export default function TabTopNotch({ hideBell }: TabTopNotchProps) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      sb.removeChannel(channel);
     };
   }, [user?.id, loadCount]);
 
@@ -85,47 +136,3 @@ export default function TabTopNotch({ hideBell }: TabTopNotchProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  fixedNotch: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 48,
-    backgroundColor: "#4F9B9B",
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    paddingLeft: 14,
-    zIndex: 50,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-  notchLogo: {
-    width: 110,
-    height: 30,
-    marginTop: -1,
-    marginLeft: -4,
-  },
-  bellButton: {
-    position: "absolute",
-    right: 14,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badgeDot: {
-    position: "absolute",
-    top: 7,
-    right: 7,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.warmAccent,
-  },
-});

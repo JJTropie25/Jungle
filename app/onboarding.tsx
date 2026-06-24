@@ -1,18 +1,100 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Linking } from "react-native";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { colors } from "../lib/theme";
+import { useTheme } from "../lib/theme-context";
+import { type ThemeColors } from "../lib/theme";
 import { useAuthState } from "../lib/auth";
 import { setCompletedOnboarding } from "../lib/onboarding";
 import { acceptPolicy } from "../lib/policy";
 import { registerForPushNotifications } from "../lib/notifications";
 
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    page: {
+      flex: 1,
+      backgroundColor: c.screenBackground,
+    },
+    container: {
+      flexGrow: 1,
+      paddingHorizontal: 24,
+      paddingTop: 90,
+      paddingBottom: 140,
+      gap: 14,
+    },
+    title: {
+      color: c.surface,
+      fontSize: 22,
+      fontWeight: "600",
+    },
+    subtitle: {
+      color: c.surface,
+      textAlign: "center",
+      fontSize: 14,
+    },
+    cardBody: {
+      color: c.surface,
+      marginBottom: 10,
+      lineHeight: 20,
+    },
+    sectionTitle: {
+      marginTop: 10,
+      color: c.surface,
+      fontWeight: "600",
+    },
+    checkboxRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: 5,
+      borderWidth: 2,
+      borderColor: c.surface,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    checkboxOn: {
+      backgroundColor: c.warmAccent,
+      borderColor: c.warmAccent,
+    },
+    checkboxLabel: {
+      color: c.surface,
+      fontWeight: "600",
+    },
+    footer: {
+      position: "absolute",
+      left: 24,
+      right: 24,
+      bottom: 32,
+    },
+    acceptButton: {
+      width: "100%",
+      backgroundColor: c.warmAccent,
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: "center",
+      marginTop: 8,
+    },
+    acceptButtonDisabled: {
+      backgroundColor: c.warmAccentSoft,
+    },
+    acceptButtonText: {
+      color: c.background,
+      fontWeight: "600",
+    },
+  });
+}
+
 export default function Onboarding() {
   const router = useRouter();
   const { user } = useAuthState();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -155,80 +237,3 @@ export default function Onboarding() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: colors.screenBackground,
-  },
-  container: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 90,
-    paddingBottom: 140,
-    gap: 14,
-  },
-  title: {
-    color: colors.surface,
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  subtitle: {
-    color: colors.surface,
-    textAlign: "center",
-    fontSize: 14,
-  },
-  cardBody: {
-    color: colors.surface,
-    marginBottom: 10,
-    lineHeight: 20,
-  },
-  sectionTitle: {
-    marginTop: 10,
-    color: colors.surface,
-    fontWeight: "700",
-  },
-  checkboxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
-    borderWidth: 2,
-    borderColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxOn: {
-    backgroundColor: colors.warmAccent,
-    borderColor: colors.warmAccent,
-  },
-  checkboxLabel: {
-    color: colors.surface,
-    fontWeight: "600",
-  },
-  footer: {
-    position: "absolute",
-    left: 24,
-    right: 24,
-    bottom: 32,
-  },
-  acceptButton: {
-    width: "100%",
-    backgroundColor: colors.warmAccent,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  acceptButtonDisabled: {
-    backgroundColor: colors.warmAccentSoft,
-  },
-  acceptButtonText: {
-    color: colors.background,
-    fontWeight: "700",
-  },
-});

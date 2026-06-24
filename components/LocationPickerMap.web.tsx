@@ -11,7 +11,8 @@ export default function LocationPickerMap({ latitude, longitude, onPick }: Props
   const [ready, setReady] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const markerRef = useRef<L.Marker | null>(null);
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -57,24 +58,9 @@ export default function LocationPickerMap({ latitude, longitude, onPick }: Props
       attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
 
-    const markerIcon = new L.Icon({
-      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-      iconRetinaUrl:
-        "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [0, -28],
-      shadowSize: [41, 41],
-    });
-
-    const marker = L.marker([latitude, longitude], { icon: markerIcon }).addTo(map);
-    markerRef.current = marker;
-
-    map.on("click", (event: any) => {
-      const { lat, lng } = event.latlng;
-      marker.setLatLng([lat, lng]);
-      onPick({ latitude: lat, longitude: lng });
+    map.on("move", () => {
+      const center = map.getCenter();
+      onPickRef.current({ latitude: center.lat, longitude: center.lng });
     });
 
     mapRef.current = map;
@@ -82,22 +68,61 @@ export default function LocationPickerMap({ latitude, longitude, onPick }: Props
     return () => {
       map.remove();
       mapRef.current = null;
-      markerRef.current = null;
     };
-  }, [latitude, longitude, onPick, ready]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   useEffect(() => {
-    if (!mapRef.current || !markerRef.current) return;
-    markerRef.current.setLatLng([latitude, longitude]);
+    if (!mapRef.current) return;
     mapRef.current.setView([latitude, longitude], mapRef.current.getZoom());
   }, [latitude, longitude]);
 
-  return <View ref={containerRef as any} style={styles.map} />;
+  return (
+    <View style={styles.container}>
+      <View ref={containerRef as any} style={StyleSheet.absoluteFillObject} />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, styles.crosshairWrap]}>
+        <View style={styles.crosshair}>
+          <View style={styles.crossV} />
+          <View style={styles.crossH} />
+          <View style={styles.crossDot} />
+        </View>
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  map: {
-    flex: 1,
+  container: { flex: 1 },
+  crosshairWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  crosshair: { width: 40, height: 40 },
+  crossV: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 19,
+    width: 2,
+    backgroundColor: "rgba(20,20,20,0.82)",
+    borderRadius: 1,
+  },
+  crossH: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 19,
+    height: 2,
+    backgroundColor: "rgba(20,20,20,0.82)",
+    borderRadius: 1,
+  },
+  crossDot: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(20,20,20,0.92)",
   },
 });
-

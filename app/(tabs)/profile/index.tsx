@@ -1,20 +1,17 @@
-import { Image, Pressable, StyleSheet, Text, View, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Image, Pressable, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useI18n } from "../../lib/i18n";
-import { useTheme } from "../../lib/theme-context";
-import { type ThemeColors } from "../../lib/theme";
-import { useAuthState } from "../../lib/auth";
-import { useAppDialog } from "../../components/AppDialogProvider";
-import { supabase } from "../../lib/supabase";
-import TabTopNotch from "../../components/TabTopNotch";
+import { useI18n } from "../../../lib/i18n";
+import { supabase } from "../../../lib/supabase";
+import { useAuthState } from "../../../lib/auth";
 import { useCallback, useMemo, useState } from "react";
+import { useTheme } from "../../../lib/theme-context";
+import { type ThemeColors } from "../../../lib/theme";
+import { useAppDialog } from "../../../components/AppDialogProvider";
 import { useFocusEffect } from "@react-navigation/native";
-import * as WebBrowser from "expo-web-browser";
-import { createAccountLink, createConnectedAccount, getStripeReturnUrl } from "../../lib/stripe";
-
-WebBrowser.maybeCompleteAuthSession();
+import { ensureHostForUser, resolveHostForUser } from "../../../lib/host";
+import TabTopNotch from "../../../components/TabTopNotch";
 
 const TEAL = "#4F9B9B";
 
@@ -59,6 +56,17 @@ function makeStyles(c: ThemeColors) {
       color: "rgba(255,255,255,0.88)",
       fontWeight: "600",
     },
+    signInBtn: {
+      backgroundColor: "rgba(255,255,255,0.18)",
+      paddingVertical: 13,
+      borderRadius: 10,
+      alignItems: "center",
+    },
+    signInText: {
+      color: "#fff",
+      fontWeight: "700",
+      fontSize: 15,
+    },
 
     // List
     listRow: {
@@ -80,35 +88,7 @@ function makeStyles(c: ThemeColors) {
       backgroundColor: c.divider,
     },
 
-    // Payments row
-    paymentStatus: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-    },
-    paymentStatusDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-    },
-    paymentStatusText: {
-      fontSize: 13,
-      fontWeight: "600",
-      flexShrink: 1,
-    },
-    activateBtn: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 8,
-      backgroundColor: c.warmAccent,
-    },
-    activateBtnText: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: "#fff",
-    },
-
-    // Theme toggle
+    // Theme toggle (inline)
     themeToggle: {
       flexDirection: "row",
       backgroundColor: c.surfaceSoft,
@@ -120,25 +100,33 @@ function makeStyles(c: ThemeColors) {
       paddingVertical: 5,
       borderRadius: 6,
     },
-    themeOptionActive: { backgroundColor: TEAL },
-    themeOptionText: { fontSize: 12, color: c.textSecondary, fontWeight: "600" },
-    themeOptionTextActive: { color: "#fff", fontWeight: "700" },
+    themeOptionActive: {
+      backgroundColor: TEAL,
+    },
+    themeOptionText: {
+      fontSize: 12,
+      color: c.textSecondary,
+      fontWeight: "600",
+    },
+    themeOptionTextActive: {
+      color: "#fff",
+      fontWeight: "700",
+    },
 
     // Bottom section
     bottomSection: {
       paddingHorizontal: 20,
       paddingTop: 12,
-      gap: 10,
       borderTopWidth: 1,
       borderTopColor: c.divider,
     },
-    switchBtn: {
+    hostButton: {
       backgroundColor: c.warmAccent,
       paddingVertical: 14,
       borderRadius: 12,
       alignItems: "center",
     },
-    switchBtnText: {
+    hostButtonText: {
       color: "#fff",
       fontSize: 15,
       fontWeight: "700",
@@ -147,7 +135,7 @@ function makeStyles(c: ThemeColors) {
   });
 }
 
-export default function HostProfile() {
+export default function Profile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
@@ -155,18 +143,22 @@ export default function HostProfile() {
   const { user } = useAuthState();
   const { colors, mode, setMode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [hostStatus, setHostStatus] = useState<any>(null);
-  const [activating, setActivating] = useState(false);
+  const [hasHostMode, setHasHostMode] = useState(false);
+  const [becomingHost, setBecomingHost] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       let isMounted = true;
       if (!supabase || !user) {
         setAvatarUrl(null);
+        setHasHostMode(false);
         return () => { isMounted = false; };
       }
+      resolveHostForUser(user.id).then(({ host }) => {
+        if (!isMounted) return;
+        setHasHostMode(Boolean(host));
+      });
       supabase
         .from("profiles")
         .select("avatar_url")
@@ -176,61 +168,26 @@ export default function HostProfile() {
           if (!isMounted) return;
           setAvatarUrl(data?.avatar_url ?? null);
         });
-      supabase
-        .from("hosts")
-        .select("id, stripe_account_id, stripe_onboarding_complete, stripe_charges_enabled, stripe_payouts_enabled")
-        .eq("guest_id", user.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (!isMounted) return;
-          setHostStatus(data ?? null);
-        });
       return () => { isMounted = false; };
     }, [user])
   );
 
-  const handleActivatePayments = async () => {
-    if (!user || !supabase) return;
-    setActivating(true);
-
-    // Only create a new account if none exists yet
-    if (!hostStatus?.stripe_account_id) {
-      const created = await createConnectedAccount();
-      if (created.error) {
-        setActivating(false);
-        await dialog.alert("Payments", created.error);
-        return;
-      }
-      // Refresh host row so we have the new stripe_account_id
-      const { data: refreshed } = await supabase
-        .from("hosts")
-        .select("id, stripe_account_id, stripe_onboarding_complete, stripe_charges_enabled, stripe_payouts_enabled")
-        .eq("guest_id", user.id)
-        .maybeSingle();
-      if (refreshed) setHostStatus(refreshed);
+  const handleHost = async () => {
+    if (!user) return;
+    if (!hasHostMode) {
+      setBecomingHost(true);
+      const displayName = user.user_metadata?.username ?? user.email ?? "Host";
+      const { error } = await ensureHostForUser(user.id, displayName);
+      setBecomingHost(false);
+      if (error) { await dialog.alert(t("edit.switchHostMode"), error); return; }
+      setHasHostMode(true);
     }
-
-    const returnUrl = getStripeReturnUrl("/host-onboarding");
-    const refreshUrl = getStripeReturnUrl("/host-onboarding");
-    if (!returnUrl || !refreshUrl) {
-      setActivating(false);
-      await dialog.alert("Payments", "Missing Supabase URL.");
-      return;
-    }
-    const link = await createAccountLink(returnUrl, refreshUrl);
-    setActivating(false);
-    if (link.error || !link.url) {
-      await dialog.alert("Payments", link.error ?? "Could not start onboarding.");
-      return;
-    }
-    await WebBrowser.openBrowserAsync(link.url);
+    router.replace("/(host)/listings");
   };
 
   const displayName = user?.user_metadata?.username
     ? `@${user.user_metadata.username}`
-    : user?.email ?? "@host";
-
-  const paymentsActive = hostStatus?.stripe_onboarding_complete;
+    : user?.email ?? "@guest";
 
   return (
     <View style={styles.screen}>
@@ -238,67 +195,53 @@ export default function HostProfile() {
 
       {/* Teal header — paddingTop clears status bar + notch (48px) */}
       <View style={[styles.headerSection, { paddingTop: insets.top + 72 }]}>
-        <View style={styles.profileRow}>
-          <Image
-            source={avatarUrl ? { uri: avatarUrl } : require("../../assets/images/icon.png")}
-            style={styles.avatar}
-          />
-          <View style={styles.profileInfo}>
-            <Text style={styles.username}>{displayName}</Text>
-            <Pressable
-              style={styles.manageRow}
-              onPress={() =>
-                router.push({
-                  pathname: "/(tabs)/profile/Edit",
-                  params: { returnTo: "host" },
-                })
+        {user ? (
+          <View style={styles.profileRow}>
+            <Image
+              source={
+                avatarUrl ? { uri: avatarUrl } : require("../../../assets/images/icon.png")
               }
-            >
-              <Text style={styles.manageText}>Manage my account</Text>
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={16}
-                color="rgba(255,255,255,0.88)"
-              />
-            </Pressable>
+              style={styles.avatar}
+            />
+            <View style={styles.profileInfo}>
+              <Text style={styles.username}>{displayName}</Text>
+              <Pressable
+                style={styles.manageRow}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(tabs)/profile/Edit",
+                    params: { returnTo: "guest" },
+                  })
+                }
+              >
+                <Text style={styles.manageText}>Manage my account</Text>
+                <MaterialCommunityIcons
+                  name="chevron-right"
+                  size={16}
+                  color="rgba(255,255,255,0.88)"
+                />
+              </Pressable>
+            </View>
           </View>
-        </View>
+        ) : (
+          <Pressable style={styles.signInBtn} onPress={() => router.push("/(auth)/sign-in")}>
+            <Text style={styles.signInText}>{t("auth.signInAction")}</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Scrollable list */}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 4 }}>
 
-        {/* Payments */}
-        <View style={styles.listRow}>
-          <MaterialCommunityIcons
-            name="bank-outline"
-            size={20}
-            color={colors.textSecondary}
-          />
-          <Text style={styles.listRowLabel}>{t("payments.title")}</Text>
-          {paymentsActive ? (
-            <View style={styles.paymentStatus}>
-              <View style={[styles.paymentStatusDot, { backgroundColor: "#2A7A3A" }]} />
-              <Text style={[styles.paymentStatusText, { color: "#2A7A3A" }]} numberOfLines={1}>
-                Active
-              </Text>
-            </View>
-          ) : (
-            <Pressable
-              style={[styles.activateBtn, activating && { opacity: 0.6 }]}
-              onPress={handleActivatePayments}
-              disabled={activating}
-            >
-              <Text style={styles.activateBtnText}>
-                {activating
-                  ? "…"
-                  : hostStatus?.stripe_account_id
-                  ? "Continue Setup"
-                  : t("payments.activate")}
-              </Text>
-            </Pressable>
-          )}
-        </View>
+        {/* Payment Methods */}
+        <Pressable
+          style={styles.listRow}
+          onPress={() => dialog.alert("Payment Methods", "Coming soon")}
+        >
+          <MaterialCommunityIcons name="credit-card-outline" size={20} color={colors.textSecondary} />
+          <Text style={styles.listRowLabel}>Payment Methods</Text>
+          <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textMuted} />
+        </Pressable>
         <View style={styles.divider} />
 
         {/* Language */}
@@ -357,12 +300,20 @@ export default function HostProfile() {
 
       </ScrollView>
 
-      {/* Bottom actions */}
-      <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable style={styles.switchBtn} onPress={() => router.replace("/(tabs)/guest")}>
-          <Text style={styles.switchBtnText}>{t("host.profile.switchGuest")}</Text>
-        </Pressable>
-      </View>
+      {/* Bottom: Host button */}
+      {user ? (
+        <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 16 }]}>
+          <Pressable
+            style={[styles.hostButton, becomingHost && { opacity: 0.6 }]}
+            onPress={handleHost}
+            disabled={becomingHost}
+          >
+            <Text style={styles.hostButtonText}>
+              {becomingHost ? "…" : t("edit.switchHostMode")}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
 
     </View>
   );

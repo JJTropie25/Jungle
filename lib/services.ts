@@ -1,4 +1,17 @@
 import { supabase } from "./supabase";
+import { fetchReviewCounts } from "./reviews";
+
+export type ServiceAmenities = {
+  towels_included?: boolean;
+  hair_dryer?: boolean;
+  soap_included?: boolean;
+  dimensions?: string;
+  open_24h?: boolean;
+  quiet_location?: boolean;
+  blanket?: boolean;
+  sofa_or_bed?: "sofa" | "bed";
+  toilet_access?: boolean;
+};
 
 export type Service = {
   id: string;
@@ -13,8 +26,11 @@ export type Service = {
   latitude?: number | null;
   longitude?: number | null;
   rating?: number | null;
+  review_count?: number | null;
   distance_meters?: number | null;
   section?: string | null;
+  cancellation_minutes?: number | null;
+  amenities?: ServiceAmenities | null;
 };
 
 type FetchServicesOptions = {
@@ -34,15 +50,17 @@ export async function fetchServices(
   }
   const { data, error } = await query;
   if (error || !data) return [];
-  return data as Service[];
+  const services = data as Service[];
+  const counts = await fetchReviewCounts(services.map(s => s.id));
+  return services.map(s => ({ ...s, review_count: counts[s.id] ?? 0 }));
 }
 
 export function toPriceLabel(price: number) {
   return `€${price}`;
 }
 
-export function toDistanceLabel(distanceMeters?: number | null) {
-  if (!distanceMeters && distanceMeters !== 0) return "-";
+export function toDistanceLabel(distanceMeters?: number | null): string | undefined {
+  if (distanceMeters == null || !Number.isFinite(distanceMeters)) return undefined;
   if (distanceMeters >= 1000) {
     const km = Math.floor(distanceMeters / 1000);
     return `${km}km`;

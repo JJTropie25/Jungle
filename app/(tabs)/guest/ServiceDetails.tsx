@@ -2,30 +2,406 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  Animated,
   TouchableOpacity,
   Image,
+  ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useI18n } from "../../../lib/i18n";
 import { supabase } from "../../../lib/supabase";
 import { useAuthState } from "../../../lib/auth";
 import { addFavorite, fetchFavoriteIds, removeFavorite } from "../../../lib/favorites";
-import { colors } from "../../../lib/theme";
+import { useTheme } from "../../../lib/theme-context";
+import { type ThemeColors } from "../../../lib/theme";
+import { type ServiceAmenities, toCategoryIcon } from "../../../lib/services";
 import { addRecentlyViewedId } from "../../../lib/recentlyViewed";
 import { useAppDialog } from "../../../components/AppDialogProvider";
 import { fetchServiceReviews, type ServiceReview } from "../../../lib/reviews";
 
+const IMAGE_HEIGHT = 280;
+
+const CATEGORY_COLORS_SD: Record<string, string> = {
+  rest: "#1A4F8A",
+  shower: "#5BB5CC",
+  storage: "#C8930A",
+};
+
+function parseImageUrls(imageUrl: string | null | undefined): string[] {
+  if (!imageUrl) return [];
+  if (imageUrl.startsWith("[")) { try { return JSON.parse(imageUrl); } catch { return [imageUrl]; } }
+  return [imageUrl];
+}
+
+function toRatingWord(rating: number, t: (k: string) => string): string {
+  if (rating <= 3) return t("rating.poor");
+  if (rating <= 5) return t("rating.fair");
+  if (rating <= 7) return t("rating.good");
+  if (rating <= 9) return t("rating.veryGood");
+  return t("rating.excellent");
+}
+
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.screenBackground },
+
+    header: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+    },
+    headerBg: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    headerContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 8,
+    },
+    headerBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerBtnOnImage: {
+      backgroundColor: "rgba(0,0,0,0.35)",
+    },
+    headerSummaryRow: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      overflow: "hidden",
+    },
+    headerTitle: {
+      fontSize: 14,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: "#fff",
+      flexShrink: 1,
+    },
+
+    imageWrap: {
+      height: IMAGE_HEIGHT,
+      backgroundColor: c.surfaceSoft,
+    },
+    imageFill: {
+      width: "100%",
+      height: "100%",
+    },
+    imageGradient: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 110,
+    },
+    imagePlaceholder: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    content: {
+      backgroundColor: c.screenBackground,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      marginTop: -20,
+    },
+    section: {
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: c.divider,
+    },
+
+    serviceName: {
+      fontSize: 22,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: c.textPrimary,
+      marginBottom: 8,
+    },
+    categoryBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "flex-start",
+      gap: 4,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+    },
+    categoryBadgeText: {
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: "600",
+    },
+
+    ratingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 14,
+    },
+    ratingBadge: {
+      backgroundColor: c.textPrimary,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    ratingText: {
+      color: c.cardBackground,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    ratingTextWord: {
+      color: c.cardBackground,
+      fontSize: 11,
+      fontWeight: "600",
+      opacity: 0.8,
+    },
+    reviewCountText: {
+      color: c.textMuted,
+      fontSize: 13,
+    },
+
+    locationRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginBottom: 12,
+    },
+    locationText: {
+      flex: 1,
+      color: c.textSecondary,
+      fontSize: 14,
+    },
+    mapBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: c.accent,
+    },
+    mapBtnText: {
+      color: c.accent,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+
+    infoText: {
+      color: c.textSecondary,
+      lineHeight: 20,
+      fontWeight: "500",
+      marginBottom: 12,
+    },
+    amenitiesWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    amenityChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      backgroundColor: c.surface,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    amenityChipText: {
+      color: c.textSecondary,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+
+    sectionLabel: {
+      fontSize: 15,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: c.textPrimary,
+      marginBottom: 2,
+    },
+    dateLabel: {
+      fontSize: 13,
+      color: c.textMuted,
+      marginBottom: 4,
+    },
+    dayPanel: {
+      backgroundColor: c.surfaceSoft,
+      borderRadius: 14,
+      padding: 14,
+    },
+    dayPanelLabel: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: c.textMuted,
+      letterSpacing: 0.4,
+      textTransform: "uppercase",
+      marginBottom: 12,
+    },
+    daySlots: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    timeChip: {
+      paddingVertical: 9,
+      borderRadius: 8,
+      backgroundColor: c.cardBackground,
+      borderWidth: 1.5,
+      borderColor: "transparent",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    timeChipText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: c.textSecondary,
+      textAlign: "center",
+    },
+
+    reviewCard: {
+      backgroundColor: c.cardBackground,
+      borderRadius: 12,
+      padding: 12,
+      marginTop: 10,
+    },
+    reviewHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 6,
+      alignItems: "center",
+    },
+    reviewAuthor: {
+      fontWeight: "600",
+      color: c.textPrimary,
+    },
+    reviewRating: {
+      fontWeight: "600",
+      color: c.textPrimary,
+    },
+    reviewText: {
+      color: c.textSecondary,
+      lineHeight: 19,
+    },
+    replyBlock: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: c.divider,
+    },
+    replyLabel: {
+      fontSize: 11,
+      fontWeight: "700",
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      color: c.textMuted,
+      marginBottom: 4,
+    },
+    replyText: {
+      color: c.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+
+    pageDots: {
+      position: "absolute",
+      bottom: 10,
+      left: 0,
+      right: 0,
+      flexDirection: "row",
+      justifyContent: "center",
+      gap: 5,
+      pointerEvents: "none",
+    } as any,
+    pageDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: "rgba(255,255,255,0.5)",
+    },
+    pageDotActive: {
+      width: 14,
+      backgroundColor: "#fff",
+    },
+
+    bookBar: {
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      backgroundColor: c.screenBackground,
+      borderTopWidth: 1,
+      borderTopColor: c.divider,
+    },
+    bookBarInner: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      gap: 16,
+    },
+    priceBlock: {
+      alignItems: "flex-end",
+    },
+    priceValue: {
+      fontSize: 20,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: c.warmAccent,
+      lineHeight: 24,
+    },
+    priceLabel: {
+      fontSize: 11,
+      color: c.textSecondary,
+    },
+    bookButton: {
+      paddingHorizontal: 22,
+      paddingVertical: 14,
+      backgroundColor: c.warmAccent,
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    bookButtonDisabled: {
+      backgroundColor: c.warmAccentSoft,
+    },
+    bookText: {
+      color: "#fff",
+      fontWeight: "600",
+      fontSize: 16,
+    },
+  });
+}
+
 export default function ServiceDetails() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const { t } = useI18n();
   const { user } = useAuthState();
   const dialog = useAppDialog();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const { destination, timeslot, people, microservice, serviceId } =
     useLocalSearchParams<{
       destination?: string;
@@ -35,53 +411,63 @@ export default function ServiceDetails() {
       serviceId?: string;
     }>();
 
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [headerOpaque, setHeaderOpaque] = useState(false);
+
+  const headerBgOpacity = scrollY.interpolate({
+    inputRange: [IMAGE_HEIGHT - 60, IMAGE_HEIGHT],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
+  const titleOpacity = scrollY.interpolate({
+    inputRange: [IMAGE_HEIGHT - 20, IMAGE_HEIGHT + 20],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
+
   const [slots, setSlots] = useState<{ id: string; time: string; start: string; end: string }[]>([]);
   const [, setLoadingSlots] = useState(true);
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [serviceTitle, setServiceTitle] = useState<string | null>(null);
   const [serviceLocation, setServiceLocation] = useState<string | null>(null);
   const [serviceDescription, setServiceDescription] = useState<string | null>(null);
+  const [serviceCategory, setServiceCategory] = useState<string | null>(null);
+  const [serviceAmenities, setServiceAmenities] = useState<ServiceAmenities | null>(null);
+  const [serviceLatitude, setServiceLatitude] = useState<number | null>(null);
+  const [serviceLongitude, setServiceLongitude] = useState<number | null>(null);
+  const [servicePrice, setServicePrice] = useState<number | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [reviews, setReviews] = useState<ServiceReview[]>([]);
 
   useEffect(() => {
     let isMounted = true;
-    if (!serviceId || !supabase) {
-      setLoadingSlots(false);
-      return;
-    }
+    if (!serviceId || !supabase) { setLoadingSlots(false); return; }
+    const sb = supabase;
     setLoadingSlots(true);
-    supabase
-      .from("service_slots")
-      .select("id, slot_start, slot_end")
-      .eq("service_id", serviceId)
-      .order("slot_start", { ascending: true })
-      .then(({ data }) => {
+    (async () => {
+      try {
+        const nowIso = new Date().toISOString();
+        const { data } = await sb
+          .from("service_slots")
+          .select("id, slot_start, slot_end")
+          .eq("service_id", serviceId)
+          .gte("slot_start", nowIso)
+          .order("slot_start", { ascending: true });
         if (!isMounted) return;
-        const mapped =
-          data?.map((row) => {
-            const start = new Date(row.slot_start);
-            const time = `${String(start.getHours()).padStart(2, "0")}:${String(
-              start.getMinutes()
-            ).padStart(2, "0")}`;
-            return {
-              id: row.id,
-              time,
-              start: row.slot_start,
-              end: row.slot_end,
-            };
-          }) ?? [];
+        const mapped = data?.map((row) => {
+          const start = new Date(row.slot_start);
+          const time = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
+          return { id: row.id, time, start: row.slot_start, end: row.slot_end };
+        }) ?? [];
         setSlots(mapped);
         setLoadingSlots(false);
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setLoadingSlots(false);
-      });
-    return () => {
-      isMounted = false;
-    };
+      } catch {
+        if (isMounted) setLoadingSlots(false);
+      }
+    })();
+    return () => { isMounted = false; };
   }, [serviceId]);
 
   useEffect(() => {
@@ -89,34 +475,32 @@ export default function ServiceDetails() {
     if (!serviceId || !supabase) return;
     supabase
       .from("services")
-      .select("title, location, image_url, description")
+      .select("title, location, image_url, description, category, amenities, latitude, longitude, price_eur")
       .eq("id", serviceId)
       .single()
       .then(({ data }) => {
         if (!isMounted) return;
-        setImageUrl(data?.image_url ?? null);
+        setImageUrls(parseImageUrls(data?.image_url));
         setServiceTitle(data?.title ?? null);
         setServiceLocation(data?.location ?? null);
         setServiceDescription(data?.description ?? null);
+        setServiceCategory(data?.category ?? null);
+        setServiceAmenities((data?.amenities as ServiceAmenities) ?? null);
+        setServiceLatitude(data?.latitude ?? null);
+        setServiceLongitude(data?.longitude ?? null);
+        setServicePrice(data?.price_eur ?? null);
       });
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [serviceId]);
 
   useEffect(() => {
     let isMounted = true;
-    if (!user || !serviceId) {
-      setIsFavorite(false);
-      return;
-    }
+    if (!user || !serviceId) { setIsFavorite(false); return; }
     fetchFavoriteIds(user.id).then((ids) => {
       if (!isMounted) return;
       setIsFavorite(ids.has(serviceId));
     });
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [serviceId, user]);
 
   useEffect(() => {
@@ -128,19 +512,12 @@ export default function ServiceDetails() {
     useMemo(
       () => () => {
         let mounted = true;
-        if (!serviceId) {
-          setReviews([]);
-          return () => {
-            mounted = false;
-          };
-        }
+        if (!serviceId) { setReviews([]); return () => { mounted = false; }; }
         fetchServiceReviews(serviceId).then((data) => {
           if (!mounted) return;
           setReviews(data);
         });
-        return () => {
-          mounted = false;
-        };
+        return () => { mounted = false; };
       },
       [serviceId]
     )
@@ -153,29 +530,28 @@ export default function ServiceDetails() {
     }
     if (isFavorite) {
       const { error } = await removeFavorite(user.id, serviceId);
-      if (error) {
-        await dialog.alert(t("favorites.title"), error.message);
-        return;
-      }
+      if (error) { await dialog.alert(t("favorites.title"), error.message); return; }
       setIsFavorite(false);
     } else {
       const { error } = await addFavorite(user.id, serviceId);
-      if (error) {
-        await dialog.alert(t("favorites.title"), error.message);
-        return;
-      }
+      if (error) { await dialog.alert(t("favorites.title"), error.message); return; }
       setIsFavorite(true);
     }
   };
 
-  const availableHours = useMemo(() => {
-    if (slots.length === 0) {
-      return ["09:00", "10:00", "11:00", "12:00", "14:00", "15:00"];
-    }
-    return Array.from(new Set(slots.map((s) => s.time)));
-  }, [slots]);
   const summaryTitle = serviceTitle ?? microservice ?? "-";
   const summaryLocation = serviceLocation ?? destination ?? "-";
+
+  const normalizedCategory = useMemo(() => {
+    if (serviceCategory && ["rest", "shower", "storage"].includes(serviceCategory)) {
+      return serviceCategory as "rest" | "shower" | "storage";
+    }
+    const value = String(microservice ?? "").toLowerCase();
+    if (value.includes("rest") || value.includes(t("category.rest").toLowerCase())) return "rest";
+    if (value.includes("shower") || value.includes(t("category.shower").toLowerCase())) return "shower";
+    if (value.includes("storage") || value.includes(t("category.storage").toLowerCase())) return "storage";
+    return null;
+  }, [serviceCategory, microservice, t]);
 
   const requestedDate = useMemo(() => {
     const raw = String(timeslot ?? "").trim();
@@ -185,310 +561,373 @@ export default function ServiceDetails() {
     return new Date(Number(y), Number(m) - 1, Number(d));
   }, [timeslot]);
 
-  const handleBooking = async () => {
-    if (!user) {
-      router.push("/(auth)/sign-in");
-      return;
-    }
-    if (!serviceId || !selectedHour) return;
+  const formattedDate = useMemo(() => {
+    if (!requestedDate) return null;
+    return requestedDate.toLocaleDateString(undefined, {
+      day: "numeric", month: "long", year: "numeric",
+    });
+  }, [requestedDate]);
 
+  const PANEL_GAP = 10;
+  const PANEL_PADDING = 14;
+  // ScrollView will be full-width (no parent clipping); contentPaddingH=16; peek≈20px
+  const panelWidth = screenWidth - 16 - PANEL_GAP - 20;
+  const chipWidth = Math.floor((panelWidth - PANEL_PADDING * 2 - 8 * 3) / 4);
+
+  const groupedDays = useMemo(() => {
+    const DEFAULT_HOURS = Array.from({ length: 18 }, (_, i) => {
+      const h = 9 + Math.floor(i / 2);
+      const m = i % 2 === 0 ? "00" : "30";
+      return `${String(h).padStart(2, "0")}:${m}`;
+    });
+    // Build a map of DB hours per calendar day
+    const slotsByDay = new Map<string, string[]>();
+    for (const slot of slots) {
+      const d = new Date(slot.start);
+      const key = d.toDateString();
+      if (!slotsByDay.has(key)) slotsByDay.set(key, []);
+      const list = slotsByDay.get(key)!;
+      if (!list.includes(slot.time)) list.push(slot.time);
+    }
+    // Always show 7 days starting from the requested date (or today)
+    const base = requestedDate ? new Date(requestedDate.getTime()) : new Date();
+    base.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(base.getTime());
+      d.setDate(d.getDate() + i);
+      const key = d.toDateString();
+      return {
+        dateKey: key,
+        dayLabel: d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }),
+        hours: slotsByDay.get(key) ?? DEFAULT_HOURS,
+      };
+    });
+  }, [slots, requestedDate]);
+
+  const avgRating10 = useMemo(() => {
+    if (!reviews.length) return null;
+    return reviews.reduce((s, r) => s + r.rating_10, 0) / reviews.length;
+  }, [reviews]);
+
+  const ratingLabel = avgRating10 != null ? `${avgRating10.toFixed(1)}/10` : null;
+  const ratingWord = avgRating10 != null ? toRatingWord(avgRating10, t) : null;
+
+  const amenityItems = useMemo(() => {
+    if (!serviceAmenities) return [];
+    const items: { icon: string; text: string }[] = [];
+    if (serviceAmenities.towels_included) items.push({ icon: "hanger", text: t("amenity.towels") });
+    if (serviceAmenities.hair_dryer) items.push({ icon: "hair-dryer", text: t("amenity.hairDryer") });
+    if (serviceAmenities.soap_included) items.push({ icon: "bottle-tonic-outline", text: t("amenity.soap") });
+    if (serviceAmenities.open_24h) items.push({ icon: "hours-24", text: t("amenity.open24h") });
+    if (serviceAmenities.dimensions) items.push({ icon: "cube-outline", text: t("amenity.dimensions").replace("{value}", serviceAmenities.dimensions) });
+    if (serviceAmenities.quiet_location) items.push({ icon: "volume-off", text: t("amenity.quietLocation") });
+    if (serviceAmenities.blanket) items.push({ icon: "weather-night", text: t("amenity.blanket") });
+    if (serviceAmenities.sofa_or_bed) items.push({ icon: serviceAmenities.sofa_or_bed === "bed" ? "bed-king" : "sofa", text: t("amenity.sofaBed") });
+    if (serviceAmenities.toilet_access) items.push({ icon: "toilet", text: t("amenity.toiletAccess") });
+    return items;
+  }, [serviceAmenities, t]);
+
+  const openMap = () => {
+    router.push({
+      pathname: "/Directions",
+      params: {
+        microservice: summaryTitle,
+        destination: summaryLocation,
+        latitude: serviceLatitude != null ? String(serviceLatitude) : undefined,
+        longitude: serviceLongitude != null ? String(serviceLongitude) : undefined,
+        timeslot: selectedHour ?? timeslot ?? "",
+        people: people ?? "1",
+        category: normalizedCategory ?? "",
+      },
+    });
+  };
+
+  const handleBooking = async () => {
+    if (!user) { router.push("/(auth)/sign-in"); return; }
+    if (!serviceId || !selectedHour) return;
     const [hh, mm] = selectedHour.split(":").map((v) => Number(v));
     const baseDate = requestedDate ?? new Date();
     const bookingStart = new Date(baseDate);
     bookingStart.setHours(hh, mm, 0, 0);
-
-    // If user did not choose a specific date, avoid creating immediately expired bookings.
     if (!requestedDate && bookingStart.getTime() < Date.now()) {
       bookingStart.setDate(bookingStart.getDate() + 1);
     }
-
     const bookingEnd = new Date(bookingStart.getTime() + 30 * 60 * 1000);
-    const slotStart = bookingStart.toISOString();
-    const slotEnd = bookingEnd.toISOString();
-
     router.push({
       pathname: "/(tabs)/guest/Payment",
       params: {
         serviceId,
-        slotStart,
-        slotEnd,
+        slotStart: bookingStart.toISOString(),
+        slotEnd: bookingEnd.toISOString(),
         destination: serviceLocation ?? destination ?? "",
         timeslot: selectedHour ?? timeslot ?? "",
         people,
         microservice: serviceTitle ?? microservice ?? "",
         selectedHour,
+        category: normalizedCategory ?? "",
       },
     });
   };
 
+  const catColor = normalizedCategory ? CATEGORY_COLORS_SD[normalizedCategory] : null;
+  const catIcon = normalizedCategory ? toCategoryIcon(normalizedCategory) : null;
+
   return (
-    <SafeAreaView style={styles.screen}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.container,
-          { paddingTop: insets.top + 16 },
-        ]}
-      >
-        <View style={styles.summaryBox}>
+    <View style={styles.screen}>
+
+      {/* Floating header */}
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <Animated.View
+          style={[
+            styles.headerBg,
+            { opacity: headerBgOpacity, backgroundColor: catColor ?? colors.textPrimary },
+          ]}
+        />
+        <View style={styles.headerContent}>
           <TouchableOpacity
-            style={styles.summaryBack}
-            onPress={() =>
-              router.canGoBack() ? router.back() : router.replace("/(tabs)/guest")
-            }
+            style={[styles.headerBtn, !headerOpaque && styles.headerBtnOnImage]}
+            onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/guest")}
           >
-            <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textPrimary} />
+            <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
           </TouchableOpacity>
-          <View style={styles.summaryContent}>
-            <Text style={styles.summaryTitle}>{summaryTitle}</Text>
-            <View style={styles.summaryMetaLine}>
-              <Text style={styles.summaryItem}>{summaryLocation}</Text>
-              <Text style={styles.summarySep}>|</Text>
-              <View style={styles.summaryPeople}>
-                <MaterialCommunityIcons
-                  name="account-group"
-                  size={16}
-                  color={colors.textPrimary}
-                />
-                <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
-              </View>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.summaryStar} onPress={toggleFavorite}>
+
+          <Animated.View style={[styles.headerSummaryRow, { opacity: titleOpacity }]}>
+            {catIcon && (
+              <MaterialCommunityIcons name={catIcon as any} size={14} color="#fff" />
+            )}
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {summaryTitle}
+            </Text>
+          </Animated.View>
+
+          <TouchableOpacity
+            style={[styles.headerBtn, !headerOpaque && styles.headerBtnOnImage]}
+            onPress={toggleFavorite}
+          >
             <MaterialCommunityIcons
               name={isFavorite ? "star" : "star-outline"}
               size={20}
-              color={isFavorite ? colors.accent : colors.textPrimary}
+              color="#fff"
             />
           </TouchableOpacity>
         </View>
+      </View>
 
-        <View style={styles.imageMock}>
-          {imageUrl ? (
-            <Image source={{ uri: imageUrl }} resizeMode="cover" style={styles.imageFill} />
-          ) : (
-            <Text>IMAGE</Text>
-          )}
-        </View>
-
-        <Text style={styles.sectionTitle}>{t("service.description")}</Text>
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            {serviceDescription ??
-              t("service.descriptionFallback", {
-                title: summaryTitle,
-                location: summaryLocation,
-              })}
-          </Text>
-        </View>
-
-        <Text style={styles.sectionTitle}>{t("service.availableTimes")}</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.timeRow}
-        >
-          {availableHours.map((h) => (
-            <TouchableOpacity
-              key={h}
-              style={[
-                styles.hourButton,
-                selectedHour === h && styles.hourButtonSelected,
-              ]}
-              onPress={() => setSelectedHour(h)}
+      {/* Scrollable content */}
+      <Animated.ScrollView
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          {
+            useNativeDriver: true,
+            listener: (e: any) => {
+              setHeaderOpaque(e.nativeEvent.contentOffset.y >= IMAGE_HEIGHT - 60);
+            },
+          }
+        )}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 90 + insets.bottom }}
+      >
+        {/* Full-bleed image gallery */}
+        <View style={styles.imageWrap}>
+          {imageUrls.length > 0 ? (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={{ flex: 1 }}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
+                setActiveImageIdx(idx);
+              }}
             >
-              <Text
-                style={selectedHour === h ? styles.hourTextSelected : undefined}
-              >
-                {h}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <Text style={styles.sectionTitle}>{t("service.reviews")}</Text>
-        <View style={styles.reviewsList}>
-          {reviews.length === 0 ? (
-            <View style={styles.reviewCard}>
-              <Text style={styles.reviewText}>{t("review.none")}</Text>
+              {imageUrls.map((url, i) => (
+                <Image
+                  key={i}
+                  source={{ uri: url }}
+                  style={[styles.imageFill, { width: screenWidth, height: IMAGE_HEIGHT }]}
+                  resizeMode="cover"
+                />
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <MaterialCommunityIcons name="image-outline" size={52} color={colors.textMuted} />
             </View>
-          ) : reviews.map((review) => (
-            <View key={review.id} style={styles.reviewCard}>
-              <View style={styles.reviewHeader}>
-                <Text style={styles.reviewAuthor}>{review.author_name}</Text>
-                <Text style={styles.reviewRating}>{review.rating_10}/10</Text>
-              </View>
-              <Text style={styles.reviewText}>{review.description}</Text>
+          )}
+          {imageUrls.length > 1 && (
+            <View style={styles.pageDots}>
+              {imageUrls.map((_, i) => (
+                <View key={i} style={[styles.pageDot, i === activeImageIdx && styles.pageDotActive]} />
+              ))}
             </View>
-          ))}
+          )}
+          <LinearGradient
+            colors={["rgba(0,0,0,0.45)", "transparent"]}
+            style={styles.imageGradient}
+          />
         </View>
 
-        <TouchableOpacity
-          style={[
-            styles.bookButton,
-            !selectedHour && styles.bookButtonDisabled,
-          ]}
-          disabled={!selectedHour}
-          onPress={handleBooking}
-        >
-          <Text style={styles.bookText}>{t("service.bookNow")}</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+        {/* Content */}
+        <View style={styles.content}>
+
+          {/* Section 1: name + category */}
+          <View style={styles.section}>
+            <Text style={styles.serviceName}>{summaryTitle}</Text>
+            {catColor && catIcon && (
+              <View style={[styles.categoryBadge, { backgroundColor: catColor }]}>
+                <MaterialCommunityIcons name={catIcon as any} size={13} color="#fff" />
+                <Text style={styles.categoryBadgeText}>
+                  {normalizedCategory ? t(`category.${normalizedCategory}`) : ""}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Section 2: rating + location + description + amenities */}
+          <View style={styles.section}>
+            {ratingLabel && (
+              <View style={styles.ratingRow}>
+                <View style={styles.ratingBadge}>
+                  <Text style={styles.ratingText}>{ratingLabel}</Text>
+                  {ratingWord && (
+                    <Text style={styles.ratingTextWord}>{"· " + ratingWord}</Text>
+                  )}
+                </View>
+                {reviews.length > 0 && (
+                  <Text style={styles.reviewCountText}>
+                    {t("card.reviewCount").replace("{count}", String(reviews.length))}
+                  </Text>
+                )}
+              </View>
+            )}
+
+            <View style={styles.locationRow}>
+              <MaterialCommunityIcons name="map-marker-outline" size={16} color={colors.textSecondary} />
+              <Text style={styles.locationText} numberOfLines={2}>{summaryLocation}</Text>
+              {serviceLatitude != null && serviceLongitude != null && (
+                <TouchableOpacity style={styles.mapBtn} onPress={openMap}>
+                  <MaterialCommunityIcons name="map-outline" size={13} color={colors.accent} />
+                  <Text style={styles.mapBtnText}>Mappa</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <Text style={styles.infoText}>
+              {serviceDescription ??
+                t("service.descriptionFallback", {
+                  title: summaryTitle,
+                  location: summaryLocation,
+                })}
+            </Text>
+
+            {amenityItems.length > 0 && (
+              <View style={styles.amenitiesWrap}>
+                {amenityItems.map((item, i) => (
+                  <View key={i} style={styles.amenityChip}>
+                    <MaterialCommunityIcons name={item.icon as any} size={13} color={colors.textSecondary} />
+                    <Text style={styles.amenityChipText}>{item.text}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Section 3 label — inside section for padding */}
+          <View style={[styles.section, { paddingBottom: 0 }]}>
+            <Text style={styles.sectionLabel}>{t("service.availableTimes")}</Text>
+          </View>
+          {/* Day-panel calendar — direct child of content so no parent clips the horizontal scroll */}
+          <ScrollView
+            horizontal
+            nestedScrollEnabled
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={panelWidth + PANEL_GAP}
+            decelerationRate="fast"
+            contentContainerStyle={{ paddingHorizontal: 16, gap: PANEL_GAP, paddingVertical: 12 }}
+          >
+            {groupedDays.map(({ dateKey, dayLabel, hours }) => (
+              <View key={dateKey} style={[styles.dayPanel, { width: panelWidth }]}>
+                <Text style={styles.dayPanelLabel}>{dayLabel}</Text>
+                <View style={styles.daySlots}>
+                  {hours.map((h) => (
+                    <TouchableOpacity
+                      key={h}
+                      style={[
+                        styles.timeChip,
+                        { width: chipWidth },
+                        selectedHour === h && {
+                          borderColor: catColor ?? colors.accent,
+                          backgroundColor: catColor ?? colors.accent,
+                        },
+                      ]}
+                      onPress={() => setSelectedHour(h)}
+                    >
+                      <Text
+                        style={[
+                          styles.timeChipText,
+                          selectedHour === h && { color: "#fff", fontWeight: "700" },
+                        ]}
+                      >
+                        {h}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+
+          {reviews.length > 0 && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>{t("service.reviews")}</Text>
+                {reviews.map((review) => (
+                  <View key={review.id} style={styles.reviewCard}>
+                    <View style={styles.reviewHeader}>
+                      <Text style={styles.reviewAuthor}>{review.author_name}</Text>
+                      <Text style={styles.reviewRating}>{review.rating_10}/10</Text>
+                    </View>
+                    <Text style={styles.reviewText}>{review.description}</Text>
+                    {review.host_reply ? (
+                      <View style={styles.replyBlock}>
+                        <Text style={styles.replyLabel}>Host response</Text>
+                        <Text style={styles.replyText}>{review.host_reply}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+        </View>
+      </Animated.ScrollView>
+
+      {/* Fixed book bar: price left + button right */}
+      <View style={[styles.bookBar, { paddingBottom: insets.bottom + 8 }]}>
+        <View style={styles.bookBarInner}>
+          <View style={styles.priceBlock}>
+            <Text style={styles.priceValue}>
+              {servicePrice != null ? `€${servicePrice.toFixed(2)}` : "—"}
+            </Text>
+            <Text style={styles.priceLabel}>/ slot</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.bookButton, !selectedHour && styles.bookButtonDisabled]}
+            disabled={!selectedHour}
+            onPress={handleBooking}
+          >
+            <Text style={styles.bookText}>{t("service.bookNow")}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.screenBackground },
-  container: { padding: 16, paddingBottom: 24 },
-  summaryBox: {
-    backgroundColor: colors.surface,
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.24,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 7,
-  },
-  summaryBack: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  summaryStar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  summaryContent: {
-    flex: 1,
-  },
-  summaryTitle: {
-    fontWeight: "700",
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  summaryMetaLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    columnGap: 8,
-    rowGap: 4,
-  },
-  summaryItem: {
-    fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  summarySep: {
-    color: colors.textMuted,
-    fontWeight: "600",
-  },
-  summaryPeople: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  summaryPeopleText: {
-    fontWeight: "600",
-  },
-  imageMock: {
-    height: 180,
-    backgroundColor: colors.border,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-    overflow: "hidden",
-  },
-  imageFill: {
-    width: "100%",
-    height: "100%",
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: colors.surface,
-    marginBottom: 10,
-    marginTop: 6,
-  },
-  infoCard: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-  infoText: {
-    color: colors.textSecondary,
-    lineHeight: 20,
-    fontWeight: "500",
-  },
-  timeRow: {
-    gap: 8,
-    paddingRight: 8,
-    marginBottom: 14,
-  },
-  hourButton: {
-    minWidth: 92,
-    padding: 12,
-    backgroundColor: colors.surfaceSoft,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  hourButtonSelected: {
-    backgroundColor: colors.accent,
-  },
-  hourTextSelected: {
-    fontWeight: "700",
-    color: colors.background,
-  },
-  reviewsList: {
-    gap: 10,
-    marginBottom: 18,
-  },
-  reviewCard: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 12,
-  },
-  reviewHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 6,
-    alignItems: "center",
-  },
-  reviewAuthor: {
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  reviewRating: {
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  reviewText: {
-    color: colors.textSecondary,
-    lineHeight: 19,
-  },
-  bookButton: {
-    padding: 16,
-    backgroundColor: colors.warmAccent,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  bookButtonDisabled: {
-    backgroundColor: colors.warmAccentSoft,
-  },
-  bookText: {
-    color: colors.background,
-    fontWeight: "700",
-  },
-});

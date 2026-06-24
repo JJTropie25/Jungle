@@ -6,14 +6,28 @@ export type ServiceReview = {
   description: string;
   created_at: string;
   author_name: string;
+  host_reply?: string | null;
 };
+
+export async function fetchReviewCounts(serviceIds: string[]): Promise<Record<string, number>> {
+  if (!supabase || serviceIds.length === 0) return {};
+  const { data } = await supabase
+    .from("service_reviews")
+    .select("service_id")
+    .in("service_id", serviceIds);
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    counts[row.service_id] = (counts[row.service_id] ?? 0) + 1;
+  }
+  return counts;
+}
 
 export async function fetchServiceReviews(serviceId?: string | null): Promise<ServiceReview[]> {
   if (!supabase || !serviceId) return [];
 
   const { data, error } = await supabase
     .from("service_reviews")
-    .select("id, guest_id, rating_10, description, created_at")
+    .select("id, guest_id, rating_10, description, created_at, host_reply")
     .eq("service_id", serviceId)
     .order("created_at", { ascending: false });
 
@@ -43,7 +57,17 @@ export async function fetchServiceReviews(serviceId?: string | null): Promise<Se
     description: row.description ?? "",
     created_at: row.created_at ?? new Date().toISOString(),
     author_name: namesById.get(row.guest_id) ?? "Guest",
+    host_reply: row.host_reply ?? null,
   }));
+}
+
+export async function replyToReview(reviewId: string, reply: string): Promise<string | null> {
+  if (!supabase) return "Supabase non configurato.";
+  const { error } = await supabase
+    .from("service_reviews")
+    .update({ host_reply: reply.trim() || null })
+    .eq("id", reviewId);
+  return error?.message ?? null;
 }
 
 export async function hasReviewForBooking(bookingId?: string | null): Promise<boolean> {

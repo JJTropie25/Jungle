@@ -1,14 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "../lib/supabase";
 import { useI18n } from "../lib/i18n";
-import { colors } from "../lib/theme";
+import { useTheme } from "../lib/theme-context";
+import { type ThemeColors } from "../lib/theme";
 import * as Linking from "expo-linking";
+
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.screenBackground,
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 12,
+    },
+    message: {
+      color: c.surface,
+      fontWeight: "600",
+    },
+  });
+}
 
 export default function AuthCallback() {
   const router = useRouter();
   const { t } = useI18n();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -17,16 +36,16 @@ export default function AuthCallback() {
       return;
     }
 
+    const sb = supabase;
+
     const exchange = async () => {
-      // If auth state is already present, callback page can exit immediately.
-      const { data: existing } = await supabase.auth.getSession();
+      const { data: existing } = await sb.auth.getSession();
       if (existing.session) {
         router.replace("/(tabs)/guest");
         return;
       }
 
       const handleUrl = async (urlString: string) => {
-        // Supabase can return either OAuth code flow or hash tokens depending on provider/runtime.
         const errorDescription = (() => {
           const parsed = Linking.parse(urlString);
           const err =
@@ -44,9 +63,9 @@ export default function AuthCallback() {
         const code = typeof codeParam === "string" ? codeParam : null;
 
         if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          const { error } = await sb.auth.exchangeCodeForSession(code);
           if (error) {
-            const { data } = await supabase.auth.getSession();
+            const { data } = await sb.auth.getSession();
             if (data.session) {
               router.replace("/(tabs)/guest");
               return;
@@ -63,7 +82,7 @@ export default function AuthCallback() {
         const accessToken = hashParams.get("access_token");
         const refreshToken = hashParams.get("refresh_token");
         if (accessToken && refreshToken) {
-          const { error } = await supabase.auth.setSession({
+          const { error } = await sb.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
@@ -91,9 +110,8 @@ export default function AuthCallback() {
 
       let resolved = false;
       const tryWaitForSession = async () => {
-        // Some providers complete in background and persist session without URL callback event.
         for (let i = 0; i < 6; i += 1) {
-          const { data } = await supabase.auth.getSession();
+          const { data } = await sb.auth.getSession();
           if (data.session) {
             resolved = true;
             router.replace("/(tabs)/guest");
@@ -128,17 +146,3 @@ export default function AuthCallback() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.screenBackground,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-  },
-  message: {
-    color: colors.surface,
-    fontWeight: "600",
-  },
-});

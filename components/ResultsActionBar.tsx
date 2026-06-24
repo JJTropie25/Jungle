@@ -1,5 +1,4 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { colors } from "../lib/theme";
 
 type Action = {
   label: string;
@@ -16,7 +15,14 @@ export default function ResultsActionBar({ actions }: { actions: Action[] }) {
           style={styles.button}
           onPress={action.onPress}
         >
-          <Text style={styles.buttonText}>{action.label}</Text>
+          <Text
+            style={styles.buttonText}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+          >
+            {action.label}
+          </Text>
           {action.badge ? <View style={styles.badge} /> : null}
         </TouchableOpacity>
       ))}
@@ -32,18 +38,24 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
+    height: 36,
     marginHorizontal: 4,
-    padding: 12,
-    backgroundColor: colors.warmSurface,
-    borderWidth: 1,
-    borderColor: colors.warmAccentSoft,
+    paddingHorizontal: 6,
+    backgroundColor: "#4F9B9B",
     borderRadius: 8,
     alignItems: "center",
+    justifyContent: "center",
     position: "relative",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   buttonText: {
-    color: colors.warmAccentDark,
-    fontWeight: "700",
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 13,
   },
   badge: {
     position: "absolute",
@@ -52,6 +64,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.warmAccentDark,
+    backgroundColor: "#fff",
   },
 });

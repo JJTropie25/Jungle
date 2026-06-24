@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Service } from "./services";
+import type { Service, ServiceAmenities } from "./services";
 
 export type HostAccount = {
   id: string;
@@ -121,6 +121,8 @@ type UpdateListingInput = {
   longitude?: number | null;
   image_url?: string | null;
   slotTimes: string[];
+  cancellationMinutes?: number | null;
+  amenities?: ServiceAmenities | null;
 };
 
 type CreateListingInput = {
@@ -134,6 +136,8 @@ type CreateListingInput = {
   longitude?: number | null;
   image_url?: string | null;
   slotTimes: string[];
+  cancellationMinutes?: number | null;
+  amenities?: ServiceAmenities | null;
 };
 
 function normalizeSlotTimes(times: string[]): string[] {
@@ -159,6 +163,8 @@ export async function updateHostListing(input: UpdateListingInput): Promise<stri
     longitude,
     image_url,
     slotTimes,
+    cancellationMinutes,
+    amenities,
   } = input;
   if (!serviceId) return "Missing service id.";
 
@@ -173,6 +179,8 @@ export async function updateHostListing(input: UpdateListingInput): Promise<stri
       latitude: latitude ?? null,
       longitude: longitude ?? null,
       image_url: image_url ?? null,
+      cancellation_minutes: cancellationMinutes ?? null,
+      amenities: amenities ?? null,
     })
     .eq("id", serviceId);
 
@@ -228,6 +236,8 @@ export async function createHostListing(
     longitude,
     image_url,
     slotTimes,
+    cancellationMinutes,
+    amenities,
   } = input;
   if (!hostId) return { error: "Missing host id.", serviceId: null };
 
@@ -243,6 +253,8 @@ export async function createHostListing(
       latitude: latitude ?? null,
       longitude: longitude ?? null,
       image_url: image_url ?? null,
+      cancellation_minutes: cancellationMinutes ?? null,
+      amenities: amenities ?? null,
     })
     .select("id")
     .single();

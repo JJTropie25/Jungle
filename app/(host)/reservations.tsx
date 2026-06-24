@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import { FlatList, Image, StyleSheet, Text, View, TouchableOpacity } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import TabTopNotch from "../../components/TabTopNotch";
 import { useI18n } from "../../lib/i18n";
 import { useAuthState } from "../../lib/auth";
-import { colors } from "../../lib/theme";
+import { useTheme } from "../../lib/theme-context";
+import { type ThemeColors } from "../../lib/theme";
 import { fetchHostReservations, resolveHostForUser, type HostReservation } from "../../lib/host";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -21,11 +22,129 @@ function toSlotLabel(startIso: string, endIso: string) {
   return `${date} ${hhmm(start)}-${hhmm(end)}`;
 }
 
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.screenBackground },
+    container: { paddingBottom: 24 },
+    titleBlock: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 4,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: c.textPrimary,
+    },
+    hostSubtitle: {
+      marginTop: 4,
+      color: c.textSecondary,
+      fontWeight: "600",
+    },
+    emptyText: {
+      marginTop: 36,
+      textAlign: "center",
+      color: c.textSecondary,
+      fontWeight: "600",
+      paddingHorizontal: 16,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: c.divider,
+      marginHorizontal: 16,
+    },
+    card: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      backgroundColor: c.listBackground,
+      height: 140,
+    },
+    cardImageWrap: {
+      width: 110,
+      flexShrink: 0,
+      paddingVertical: 10,
+      paddingLeft: 12,
+      paddingRight: 8,
+    },
+    cardImage: {
+      flex: 1,
+      borderRadius: 8,
+      backgroundColor: c.surfaceSoft,
+    },
+    cardBody: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingRight: 12,
+      overflow: "hidden",
+      gap: 4,
+    },
+    cardTitle: {
+      color: c.textPrimary,
+      fontWeight: "600",
+      fontSize: 14,
+    },
+    textExpired: {
+      color: c.textMuted,
+    },
+    badgeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      flexWrap: "wrap",
+    },
+    guestBadge: {
+      backgroundColor: c.surface,
+      color: c.textPrimary,
+      fontWeight: "600",
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+      fontSize: 11,
+    },
+    statusBadge: {
+      fontWeight: "600",
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+      color: "#1C1C1C",
+      fontSize: 11,
+    },
+    statusReserved: {
+      backgroundColor: "#F5E7A6",
+    },
+    statusCheckedIn: {
+      backgroundColor: "#BFE9D2",
+      color: "#1F6E44",
+    },
+    statusExpired: {
+      backgroundColor: "#D5E0E0",
+      color: "#687878",
+    },
+    summaryStack: {
+      gap: 3,
+    },
+    summaryRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+    summaryItem: {
+      fontWeight: "600",
+      color: c.textSecondary,
+      fontSize: 12,
+      flexShrink: 1,
+    },
+  });
+}
+
 export default function HostReservations() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { user } = useAuthState();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const placeholderImage = require("../../assets/images/react-logo.png");
 
   const [items, setItems] = useState<HostReservation[]>([]);
@@ -62,29 +181,34 @@ export default function HostReservations() {
   }, [hasHost, loading, t]);
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <View style={styles.screen}>
       <TabTopNotch />
-      <View style={[styles.container, { paddingTop: insets.top + 58 }]}>
-        <Text style={styles.title}>{t("host.reservations.title")}</Text>
-        {hostLabel ? <Text style={styles.hostSubtitle}>{hostLabel}</Text> : null}
-        {items.length === 0 ? (
-          <Text style={styles.emptyText}>{emptyText}</Text>
-        ) : (
-          <FlatList
-            data={items}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => {
-              const isExpired = new Date(item.slot_end).getTime() < Date.now();
-              const isCheckedIn = Boolean(item.checked_in_at);
-              const statusLabel = isExpired
-                ? t("booking.expired")
-                : isCheckedIn
-                ? t("host.reservation.checkedIn")
-                : t("host.reservation.reserved");
-              return (
+      <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[styles.container, { paddingTop: insets.top + 58 }]}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={styles.divider} />}
+          ListHeaderComponent={
+            <View style={styles.titleBlock}>
+              <Text style={styles.title}>{t("host.reservations.title")}</Text>
+              {hostLabel ? <Text style={styles.hostSubtitle}>{hostLabel}</Text> : null}
+            </View>
+          }
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>{emptyText}</Text>
+          }
+          renderItem={({ item }) => {
+            const isExpired = new Date(item.slot_end).getTime() < Date.now();
+            const isCheckedIn = Boolean(item.checked_in_at);
+            const statusLabel = isExpired
+              ? t("booking.expired")
+              : isCheckedIn
+              ? t("host.reservation.checkedIn")
+              : t("host.reservation.reserved");
+            return (
               <TouchableOpacity
-                style={[styles.card, isExpired && styles.cardExpired]}
+                style={styles.card}
                 onPress={() =>
                   router.push({
                     pathname: "/(host)/reservation/[bookingId]",
@@ -92,12 +216,20 @@ export default function HostReservations() {
                   })
                 }
               >
-                <Image
-                  source={item.service_image_url ? { uri: item.service_image_url } : placeholderImage}
-                  style={styles.cardImage}
-                />
+                <View style={styles.cardImageWrap}>
+                  <Image
+                    source={item.service_image_url ? { uri: item.service_image_url } : placeholderImage}
+                    style={styles.cardImage}
+                    resizeMode="cover"
+                  />
+                </View>
                 <View style={styles.cardBody}>
-                  <Text style={[styles.cardTitle, isExpired && styles.textExpired]}>{item.service_title}</Text>
+                  <Text
+                    style={[styles.cardTitle, isExpired && styles.textExpired]}
+                    numberOfLines={2}
+                  >
+                    {item.service_title}
+                  </Text>
                   <View style={styles.badgeRow}>
                     <Text style={styles.guestBadge}>{item.guest_username ?? "Guest"}</Text>
                     <Text
@@ -114,146 +246,36 @@ export default function HostReservations() {
                     </Text>
                   </View>
                   <View style={styles.summaryStack}>
-                    {item.service_category ? (
-                      <MaterialCommunityIcons
-                        name={toCategoryIcon(item.service_category) as any}
-                        size={16}
-                        color={isExpired ? "#718080" : colors.textPrimary}
-                      />
-                    ) : null}
-                    <Text style={[styles.summaryItem, isExpired && styles.textExpired]}>
-                      {toSlotLabel(item.slot_start, item.slot_end)}
-                    </Text>
-                    <Text style={[styles.summaryItem, isExpired && styles.textExpired]}>
-                      {item.service_location}
-                    </Text>
-                    <View style={styles.summaryPeople}>
-                      <MaterialCommunityIcons
-                        name="account-group"
-                        size={16}
-                        color={isExpired ? "#718080" : colors.textPrimary}
-                      />
-                      <Text style={[styles.summaryPeopleText, isExpired && styles.textExpired]}>
+                    <View style={styles.summaryRow}>
+                      {item.service_category ? (
+                        <MaterialCommunityIcons
+                          name={toCategoryIcon(item.service_category) as any}
+                          size={13}
+                          color={colors.textSecondary}
+                        />
+                      ) : null}
+                      <Text style={[styles.summaryItem, isExpired && styles.textExpired]} numberOfLines={1}>
+                        {toSlotLabel(item.slot_start, item.slot_end)}
+                      </Text>
+                    </View>
+                    <View style={styles.summaryRow}>
+                      <MaterialCommunityIcons name="map-marker-outline" size={13} color={colors.textSecondary} />
+                      <Text style={[styles.summaryItem, isExpired && styles.textExpired]} numberOfLines={1}>
+                        {item.service_location}
+                      </Text>
+                    </View>
+                    <View style={styles.summaryRow}>
+                      <MaterialCommunityIcons name="account-group" size={13} color={colors.textSecondary} />
+                      <Text style={[styles.summaryItem, isExpired && styles.textExpired]}>
                         {item.people_count}
                       </Text>
                     </View>
                   </View>
                 </View>
               </TouchableOpacity>
-              );
-            }}
-          />
-        )}
-      </View>
-    </SafeAreaView>
+            );
+          }}
+        />
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.screenBackground },
-  container: { flex: 1, paddingHorizontal: 16 },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: colors.surface,
-  },
-  hostSubtitle: {
-    marginTop: 4,
-    color: colors.textSecondary,
-    fontWeight: "600",
-  },
-  emptyText: {
-    marginTop: 36,
-    textAlign: "center",
-    color: colors.textSecondary,
-    fontWeight: "600",
-  },
-  listContent: {
-    paddingTop: 12,
-    paddingBottom: 24,
-    gap: 10,
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.24,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 7,
-  },
-  cardExpired: {
-    backgroundColor: "#EAF0F0",
-    borderColor: "#B9C9C9",
-  },
-  cardImage: {
-    width: "100%",
-    height: 110,
-    borderRadius: 10,
-    marginBottom: 10,
-    backgroundColor: colors.surfaceSoft,
-  },
-  cardBody: {
-    gap: 6,
-  },
-  cardTitle: {
-    color: colors.textPrimary,
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  textExpired: {
-    color: "#6C7C7C",
-  },
-  badgeRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  guestBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.surfaceSoft,
-    color: colors.textPrimary,
-    fontWeight: "700",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusBadge: {
-    alignSelf: "flex-start",
-    fontWeight: "700",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    color: "#1C1C1C",
-  },
-  statusReserved: {
-    backgroundColor: "#F5E7A6",
-  },
-  statusCheckedIn: {
-    backgroundColor: "#BFE9D2",
-    color: "#1F6E44",
-  },
-  statusExpired: {
-    backgroundColor: "#D5E0E0",
-    color: "#687878",
-  },
-  summaryStack: {
-    gap: 6,
-  },
-  summaryItem: {
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  summaryPeople: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  summaryPeopleText: {
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-});

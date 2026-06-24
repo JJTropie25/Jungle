@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import type { Service } from "./services";
+import { fetchReviewCounts } from "./reviews";
 
 export async function fetchFavoriteIds(guestId: string): Promise<Set<string>> {
   if (!supabase) return new Set();
@@ -43,13 +44,15 @@ export async function fetchFavoriteServices(guestId: string): Promise<Service[]>
 
   const { data: services, error: serviceError } = await supabase
     .from("services")
-    .select("id, title, category, price_eur, location, distance_meters, rating, image_url")
+    .select("id, title, category, price_eur, location, distance_meters, rating, image_url, amenities, cancellation_minutes")
     .in("id", ids);
 
   if (serviceError || !services) return [];
 
   const order = new Map(ids.map((id, index) => [id, index]));
-  return [...(services as Service[])].sort(
+  const sorted = [...(services as Service[])].sort(
     (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)
   );
+  const counts = await fetchReviewCounts(sorted.map(s => s.id));
+  return sorted.map(s => ({ ...s, review_count: counts[s.id] ?? 0 }));
 }

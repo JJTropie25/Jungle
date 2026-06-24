@@ -2,11 +2,19 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { colors } from "../../../lib/theme";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useI18n } from "../../../lib/i18n";
+import { useI18n } from "../lib/i18n";
+import { useTheme } from "../lib/theme-context";
+import { type ThemeColors } from "../lib/theme";
 import * as Location from "expo-location";
-import DirectionsMap from "../../../components/DirectionsMap";
+import DirectionsMap from "../components/DirectionsMap";
+
+const CATEGORY_COLORS: Record<string, string> = {
+  rest: "#1A4F8A",
+  shower: "#5BB5CC",
+  storage: "#C8930A",
+};
+const DEFAULT_PILL_COLOR = "#4F9B9B";
 
 type Params = {
   microservice?: string;
@@ -15,6 +23,7 @@ type Params = {
   people?: string;
   latitude?: string;
   longitude?: string;
+  category?: string;
 };
 
 const cityCoords: Record<string, { lat: number; lon: number }> = {
@@ -41,7 +50,6 @@ function decodePolyline(encoded: string): LatLng[] {
   let lat = 0;
   let lng = 0;
   const coordinates: LatLng[] = [];
-
   while (index < len) {
     let b = 0;
     let shift = 0;
@@ -53,7 +61,6 @@ function decodePolyline(encoded: string): LatLng[] {
     } while (b >= 0x20);
     const dlat = (result & 1) ? ~(result >> 1) : result >> 1;
     lat += dlat;
-
     shift = 0;
     result = 0;
     do {
@@ -63,24 +70,68 @@ function decodePolyline(encoded: string): LatLng[] {
     } while (b >= 0x20);
     const dlng = (result & 1) ? ~(result >> 1) : result >> 1;
     lng += dlng;
-
     coordinates.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
   }
   return coordinates;
 }
 
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.screenBackground },
+    mapContainer: { flex: 1 },
+    mapTop: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      paddingHorizontal: 16,
+    },
+    summaryBox: {
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      shadowColor: "#000",
+      shadowOpacity: 0.28,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 8,
+    },
+    summaryBack: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: "rgba(0,0,0,0.18)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    summaryInfo: { flex: 1 },
+    summaryTitle: {
+      fontSize: 15,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: "#fff",
+    },
+    summaryDestination: {
+      fontSize: 12,
+      color: "rgba(255,255,255,0.82)",
+      marginTop: 1,
+    },
+  });
+}
+
 export default function Directions() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const {
-    microservice,
-    destination,
-    timeslot,
-    people,
-    latitude,
-    longitude,
-  } = useLocalSearchParams<Params>();
+  const { microservice, destination, timeslot, people, latitude, longitude, category } =
+    useLocalSearchParams<Params>();
+
+  const catColor = (category && CATEGORY_COLORS[category]) ?? DEFAULT_PILL_COLOR;
   const { t } = useI18n();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const mapRef = useRef<any>(null);
   const [origin, setOrigin] = useState<LatLng | null>(null);
@@ -102,15 +153,10 @@ export default function Directions() {
         accuracy: Location.Accuracy.Balanced,
       });
       if (!mounted) return;
-      setOrigin({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
+      setOrigin({ latitude: position.coords.latitude, longitude: position.coords.longitude });
     };
     loadOrigin().catch(() => null);
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
@@ -131,21 +177,13 @@ export default function Directions() {
         routes?: { overview_polyline?: { points?: string } }[];
       };
       if (!mounted) return;
-      if (payload.status !== "OK") {
-        setRoute([origin, destinationCoords]);
-        return;
-      }
+      if (payload.status !== "OK") { setRoute([origin, destinationCoords]); return; }
       const points = payload.routes?.[0]?.overview_polyline?.points;
-      if (!points) {
-        setRoute([origin, destinationCoords]);
-        return;
-      }
+      if (!points) { setRoute([origin, destinationCoords]); return; }
       setRoute(decodePolyline(points));
     };
     loadRoute().catch(() => null);
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [origin, destinationCoords]);
 
   useEffect(() => {
@@ -173,32 +211,17 @@ export default function Directions() {
           onBack={() => router.back()}
         />
         <View style={[styles.mapTop, { paddingTop: insets.top + 12 }]}>
-          <View style={styles.summaryBox}>
-            <TouchableOpacity
-              style={styles.summaryBack}
-              onPress={() => router.back()}
-            >
-              <MaterialCommunityIcons
-                name="arrow-left"
-                size={20}
-                color={colors.textPrimary}
-              />
+          <View style={[styles.summaryBox, { backgroundColor: catColor }]}>
+            <TouchableOpacity style={styles.summaryBack} onPress={() => router.back()}>
+              <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
             </TouchableOpacity>
-            <View style={styles.summaryLine}>
-              <Text style={styles.summaryItem}>{microservice ?? "-"}</Text>
-              <Text style={styles.summarySep}>|</Text>
-              <Text style={styles.summaryItem}>{destination ?? "-"}</Text>
-              <Text style={styles.summarySep}>|</Text>
-              <Text style={styles.summaryItem}>{timeslot ?? "-"}</Text>
-              <Text style={styles.summarySep}>|</Text>
-              <View style={styles.summaryPeople}>
-                <MaterialCommunityIcons
-                  name="account-group"
-                  size={16}
-                  color={colors.textPrimary}
-                />
-                <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
-              </View>
+            <View style={styles.summaryInfo}>
+              <Text style={styles.summaryTitle} numberOfLines={1}>{microservice ?? "-"}</Text>
+              {destination ? (
+                <Text style={styles.summaryDestination} numberOfLines={1}>
+                  {destination}
+                </Text>
+              ) : null}
             </View>
           </View>
         </View>
@@ -206,62 +229,3 @@ export default function Directions() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.screenBackground },
-  mapContainer: { flex: 1 },
-  mapTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-  },
-  summaryBox: {
-    backgroundColor: colors.surface,
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.24,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 7,
-  },
-  summaryLine: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    columnGap: 8,
-    rowGap: 4,
-  },
-  summaryItem: {
-    fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  summarySep: {
-    color: colors.textMuted,
-    fontWeight: "600",
-  },
-  summaryPeople: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  summaryPeopleText: {
-    fontWeight: "600",
-  },
-  summaryBack: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
-

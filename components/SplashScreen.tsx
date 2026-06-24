@@ -1,5 +1,4 @@
 import { Image, StyleSheet, View } from "react-native";
-import { colors } from "../lib/theme";
 
 export default function SplashScreen() {
   const logo = require("../assets/images/Lagoon_notch.png");
@@ -13,7 +12,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.screenBackground,
+    backgroundColor: "#0B3F3F",
     alignItems: "center",
     justifyContent: "center",
   },

@@ -2,21 +2,192 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+  FlatList,
+  Pressable,
   Image,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useI18n } from "../../lib/i18n";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useIsFocused } from "@react-navigation/native";
 import { supabase } from "../../lib/supabase";
 import { useAuthState } from "../../lib/auth";
-import { colors } from "../../lib/theme";
+import { useTheme } from "../../lib/theme-context";
+import { type ThemeColors } from "../../lib/theme";
 import TabTopNotch from "../../components/TabTopNotch";
 import { toCategoryIcon } from "../../lib/services";
+
+const CATEGORY_COLORS: Record<string, string> = {
+  rest: "#1A4F8A",
+  shower: "#5BB5CC",
+  storage: "#C8930A",
+};
+
+type BookingItem = {
+  id: string;
+  title: string;
+  destination: string;
+  timeslot: string;
+  people: string;
+  serviceId: string;
+  hasReview: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+  imageUrl?: string | null;
+  category?: "rest" | "shower" | "storage" | null;
+  slotStart: string;
+};
+
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.screenBackground },
+    container: { paddingBottom: 24 },
+    pageTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      marginBottom: 12,
+      color: c.textPrimary,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: c.divider,
+      marginHorizontal: 16,
+    },
+    card: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      backgroundColor: c.listBackground,
+      minHeight: 160,
+    },
+    cardExpired: {
+      opacity: 0.7,
+    },
+    cardImageWrap: {
+      width: 110,
+      flexShrink: 0,
+      paddingVertical: 10,
+      paddingLeft: 12,
+      paddingRight: 8,
+    },
+    cardImage: {
+      flex: 1,
+      borderRadius: 8,
+      backgroundColor: c.surfaceSoft,
+    },
+    cardContent: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingRight: 12,
+    },
+    cardTitle: {
+      fontWeight: "600",
+      fontSize: 14,
+      color: c.textPrimary,
+      marginBottom: 4,
+    },
+    textExpired: {
+      color: c.textMuted,
+    },
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 5,
+      marginBottom: 6,
+    },
+    categoryBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      borderRadius: 6,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+    },
+    categoryBadgeText: {
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: "600",
+    },
+    expiredBadge: {
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      borderRadius: 6,
+      backgroundColor: c.surface,
+    },
+    expiredBadgeText: {
+      color: c.textMuted,
+      fontSize: 11,
+      fontWeight: "600",
+    },
+    infoRows: {
+      gap: 3,
+      marginBottom: 8,
+    },
+    infoRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+    infoText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: c.textSecondary,
+      flexShrink: 1,
+    },
+    buttonRow: {
+      flexDirection: "row",
+      gap: 6,
+      marginTop: "auto",
+    },
+    btnOutline: {
+      flex: 1,
+      height: 32,
+      borderRadius: 7,
+      borderWidth: 1.5,
+      borderColor: c.accent,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 6,
+    },
+    btnOutlineText: {
+      color: c.accent,
+      fontWeight: "600",
+      fontSize: 12,
+    },
+    btnFilled: {
+      flex: 1,
+      height: 32,
+      borderRadius: 7,
+      backgroundColor: c.accent,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 6,
+    },
+    btnReview: {
+      backgroundColor: c.warmAccentDark,
+    },
+    btnFilledText: {
+      color: "#fff",
+      fontWeight: "600",
+      fontSize: 12,
+    },
+    btnDisabled: {
+      opacity: 0.6,
+    },
+    emptyText: {
+      color: c.textSecondary,
+      textAlign: "center",
+      marginTop: 24,
+      fontWeight: "600",
+      paddingHorizontal: 16,
+    },
+  });
+}
 
 export default function Bookings() {
   const router = useRouter();
@@ -24,82 +195,71 @@ export default function Bookings() {
   const { t } = useI18n();
   const { user } = useAuthState();
   const isFocused = useIsFocused();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const placeholderImage = require("../../assets/images/react-logo.png");
-  const [bookings, setBookings] = useState<
-    {
-      id: string;
-      title: string;
-      destination: string;
-      timeslot: string;
-      people: string;
-      serviceId: string;
-      hasReview: boolean;
-      latitude?: number | null;
-      longitude?: number | null;
-      imageUrl?: string | null;
-      category?: "rest" | "shower" | "storage" | null;
-      slotStart: string;
-    }[]
-  >([]);
+  const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadBookings = useCallback(() => {
-    if (!supabase || !user) {
+  const loadBookings = useCallback(async () => {
+    const sb = supabase;
+    if (!sb || !user) {
       setLoading(false);
       return;
     }
     setLoading(true);
-    supabase
-      .from("bookings")
-      .select(
-        "id, slot_start, slot_end, people_count, service:services(id, title, location, latitude, longitude, image_url, category)"
-      )
-      .eq("guest_id", user.id)
-      .order("slot_start", { ascending: false })
-      .then(async ({ data }) => {
-        const mapped =
-          data?.map((row: any) => {
-            const start = new Date(row.slot_start);
-            const timeslot = `${start.getFullYear()}-${String(
-              start.getMonth() + 1
-            ).padStart(2, "0")}-${String(start.getDate()).padStart(
-              2,
-              "0"
-            )} ${String(start.getHours()).padStart(2, "0")}:${String(
-              start.getMinutes()
-            ).padStart(2, "0")}`;
-            return {
-              id: row.id,
-              title: row.service?.title ?? "-",
-              destination: row.service?.location ?? "-",
-              timeslot,
-              people: String(row.people_count ?? 1),
-              serviceId: row.service?.id ?? "",
-              hasReview: false,
-              latitude: row.service?.latitude,
-              longitude: row.service?.longitude,
-              imageUrl: row.service?.image_url ?? null,
-              category: row.service?.category ?? null,
-              slotStart: row.slot_start,
-            };
-          }) ?? [];
-        const bookingIds = mapped.map((item) => item.id);
-        if (bookingIds.length > 0) {
-          const { data: reviews } = await supabase
-            .from("service_reviews")
-            .select("booking_id")
-            .in("booking_id", bookingIds);
-          const reviewedIds = new Set((reviews ?? []).map((row: any) => row.booking_id));
-          mapped.forEach((item) => {
-            item.hasReview = reviewedIds.has(item.id);
-          });
-        }
-        setBookings(mapped);
-        setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-      });
+    try {
+      const { data } = await sb
+        .from("bookings")
+        .select(
+          "id, slot_start, slot_end, people_count, service:services(id, title, location, latitude, longitude, image_url, category)"
+        )
+        .eq("guest_id", user.id)
+        .order("slot_start", { ascending: false });
+
+      const mapped: BookingItem[] =
+        (data ?? []).map((row: any) => {
+          const start = new Date(row.slot_start);
+          const timeslot = `${start.getFullYear()}-${String(
+            start.getMonth() + 1
+          ).padStart(2, "0")}-${String(start.getDate()).padStart(
+            2,
+            "0"
+          )} ${String(start.getHours()).padStart(2, "0")}:${String(
+            start.getMinutes()
+          ).padStart(2, "0")}`;
+          return {
+            id: row.id,
+            title: row.service?.title ?? "-",
+            destination: row.service?.location ?? "-",
+            timeslot,
+            people: String(row.people_count ?? 1),
+            serviceId: row.service?.id ?? "",
+            hasReview: false,
+            latitude: row.service?.latitude,
+            longitude: row.service?.longitude,
+            imageUrl: row.service?.image_url ?? null,
+            category: row.service?.category ?? null,
+            slotStart: row.slot_start,
+          };
+        });
+
+      const bookingIds = mapped.map((item) => item.id);
+      if (bookingIds.length > 0) {
+        const { data: reviews } = await sb
+          .from("service_reviews")
+          .select("booking_id")
+          .in("booking_id", bookingIds);
+        const reviewedIds = new Set((reviews ?? []).map((row: any) => row.booking_id));
+        mapped.forEach((item) => {
+          item.hasReview = reviewedIds.has(item.id);
+        });
+      }
+      setBookings(mapped);
+      setLoading(false);
+    } catch {
+      setLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -114,220 +274,183 @@ export default function Bookings() {
     return t("bookings.empty");
   }, [loading, t, user]);
 
-  return (
-    <SafeAreaView style={styles.screen}>
-      <TabTopNotch />
-      <ScrollView
-        contentContainerStyle={[
-          styles.container,
-          { paddingTop: insets.top + 58 },
-        ]}
-      >
-        <Text style={styles.title}>{t("bookings.title")}</Text>
+  const renderItem = ({ item }: { item: BookingItem }) => {
+    const isExpired = new Date(item.slotStart).getTime() < Date.now();
+    const catColor = item.category
+      ? (CATEGORY_COLORS[item.category] ?? colors.textSecondary)
+      : null;
+    const catIcon = item.category ? toCategoryIcon(item.category) : null;
 
-        {bookings.length === 0 ? (
-          <Text style={styles.emptyText}>{emptyState}</Text>
-        ) : (
-          bookings.map((item) => {
-          const isExpired = new Date(item.slotStart).getTime() < Date.now();
-          return (
-          <View key={item.id} style={[styles.card, isExpired && styles.cardExpired]}>
-            <Image
-              source={item.imageUrl ? { uri: item.imageUrl } : placeholderImage}
-              style={styles.cardImage}
-            />
-            <Text style={[styles.cardTitle, isExpired && styles.textExpired]}>{item.title}</Text>
-            {isExpired ? <Text style={styles.expiredBadge}>{t("booking.expired")}</Text> : null}
-            <View style={styles.summaryStack}>
-              {item.category ? (
-                <MaterialCommunityIcons
-                  name={toCategoryIcon(item.category) as any}
-                  size={16}
-                  color={isExpired ? "#718080" : colors.textPrimary}
-                />
-              ) : null}
-              <Text style={[styles.summaryItem, isExpired && styles.textExpired]}>{item.timeslot}</Text>
-              <Text style={[styles.summaryItem, isExpired && styles.textExpired]}>{item.destination}</Text>
-              <View style={styles.summaryPeople}>
-                <MaterialCommunityIcons
-                  name="account-group"
-                  size={16}
-                  color={isExpired ? "#718080" : colors.textPrimary}
-                />
-                <Text style={[styles.summaryPeopleText, isExpired && styles.textExpired]}>{item.people}</Text>
+    return (
+      <View style={[styles.card, isExpired && styles.cardExpired]}>
+        <View style={styles.cardImageWrap}>
+          <Image
+            source={item.imageUrl ? { uri: item.imageUrl } : placeholderImage}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+        </View>
+        <View style={styles.cardContent}>
+          <Text
+            style={[styles.cardTitle, isExpired && styles.textExpired]}
+            numberOfLines={2}
+          >
+            {item.title}
+          </Text>
+
+          <View style={styles.metaRow}>
+            {catColor && catIcon ? (
+              <View
+                style={[
+                  styles.categoryBadge,
+                  { backgroundColor: isExpired ? colors.surfaceSoft : catColor },
+                ]}
+              >
+                <MaterialCommunityIcons name={catIcon as any} size={11} color="#fff" />
+                <Text style={styles.categoryBadgeText} numberOfLines={1}>
+                  {t(`category.${item.category}`)}
+                </Text>
               </View>
+            ) : null}
+            {isExpired ? (
+              <View style={styles.expiredBadge}>
+                <Text style={styles.expiredBadgeText}>{t("booking.expired")}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.infoRows}>
+            <View style={styles.infoRow}>
+              <MaterialCommunityIcons
+                name="clock-outline"
+                size={13}
+                color={colors.textSecondary}
+              />
+              <Text style={styles.infoText} numberOfLines={1}>{item.timeslot}</Text>
             </View>
-            <View style={styles.buttonRow}>
-              {isExpired ? (
-                <TouchableOpacity
-                  style={[styles.cardButton, styles.reviewButton, item.hasReview && styles.reviewButtonDisabled]}
+            <View style={styles.infoRow}>
+              <MaterialCommunityIcons
+                name="map-marker-outline"
+                size={13}
+                color={colors.textSecondary}
+              />
+              <Text style={styles.infoText} numberOfLines={1}>{item.destination}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <MaterialCommunityIcons
+                name="account-group"
+                size={13}
+                color={colors.textSecondary}
+              />
+              <Text style={styles.infoText}>{item.people}</Text>
+            </View>
+          </View>
+
+          <View style={styles.buttonRow}>
+            {isExpired ? (
+              <Pressable
+                style={[styles.btnFilled, styles.btnReview, item.hasReview && styles.btnDisabled]}
+                onPress={() =>
+                  router.push({
+                    pathname: "/LeaveReview",
+                    params: {
+                      bookingId: item.id,
+                      serviceId: item.serviceId,
+                      microservice: item.title,
+                      destination: item.destination,
+                      timeslot: item.timeslot,
+                    },
+                  })
+                }
+                disabled={item.hasReview}
+              >
+                <Text
+                  style={styles.btnFilledText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}
+                >
+                  {item.hasReview ? t("review.alreadySubmitted") : t("review.leave")}
+                </Text>
+              </Pressable>
+            ) : (
+              <>
+                <Pressable
+                  style={styles.btnOutline}
                   onPress={() =>
                     router.push({
-                      pathname: "/(tabs)/guest/LeaveReview",
+                      pathname: "/Directions",
                       params: {
-                        bookingId: item.id,
-                        serviceId: item.serviceId,
                         microservice: item.title,
                         destination: item.destination,
                         timeslot: item.timeslot,
+                        people: item.people,
+                        latitude: String(item.latitude),
+                        longitude: String(item.longitude),
+                        category: item.category ?? "",
                       },
                     })
                   }
-                  disabled={item.hasReview}
                 >
-                  <Text style={styles.reviewButtonText}>
-                    {item.hasReview ? t("review.alreadySubmitted") : t("review.leave")}
+                  <Text
+                    style={styles.btnOutlineText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.72}
+                  >
+                    {t("booking.getDirections")}
                   </Text>
-                </TouchableOpacity>
-              ) : (
-                <>
-                  <TouchableOpacity
-                    style={styles.cardButton}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/(tabs)/guest/Directions",
-                        params: {
-                          microservice: item.title,
-                          destination: item.destination,
-                          timeslot: item.timeslot,
-                          people: item.people,
-                          latitude: String(item.latitude),
-                          longitude: String(item.longitude),
-                        },
-                      })
-                    }
+                </Pressable>
+                <Pressable
+                  style={styles.btnFilled}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/ManageBooking",
+                      params: {
+                        bookingId: item.id,
+                        from: "bookings",
+                        microservice: item.title,
+                        destination: item.destination,
+                        timeslot: item.timeslot,
+                        people: item.people,
+                      },
+                    })
+                  }
+                >
+                  <Text
+                    style={styles.btnFilledText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.72}
                   >
-                    <Text>{t("booking.getDirections")}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.cardButton}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/(tabs)/guest/ManageBooking",
-                        params: {
-                          bookingId: item.id,
-                          from: "bookings",
-                          microservice: item.title,
-                          destination: item.destination,
-                          timeslot: item.timeslot,
-                          people: item.people,
-                        },
-                      })
-                    }
-                  >
-                    <Text>{t("booking.manage")}</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
+                    {t("booking.manage")}
+                  </Text>
+                </Pressable>
+              </>
+            )}
           </View>
-          )})
-        )}
-      </ScrollView>
-    </SafeAreaView>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.screen}>
+      <TabTopNotch />
+      <FlatList
+        data={bookings}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={[styles.container, { paddingTop: insets.top + 58 }]}
+        showsVerticalScrollIndicator={false}
+        ItemSeparatorComponent={() => <View style={styles.divider} />}
+        ListHeaderComponent={
+          <Text style={styles.pageTitle}>{t("bookings.title")}</Text>
+        }
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>{emptyState}</Text>
+        }
+        renderItem={renderItem}
+      />
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.screenBackground },
-  container: { padding: 16, paddingBottom: 24 },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 12,
-    color: colors.surface,
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: "#000",
-    shadowOpacity: 0.24,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 7,
-  },
-  cardExpired: {
-    backgroundColor: "#EAF0F0",
-    borderColor: "#B9C9C9",
-  },
-  cardImage: {
-    width: "100%",
-    height: 120,
-    borderRadius: 10,
-    marginBottom: 10,
-    backgroundColor: colors.border,
-  },
-  cardTitle: {
-    fontWeight: "700",
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  textExpired: {
-    color: "#6C7C7C",
-  },
-  expiredBadge: {
-    alignSelf: "flex-start",
-    marginBottom: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    backgroundColor: "#D5E0E0",
-    color: "#687878",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  summaryStack: {
-    gap: 6,
-    marginBottom: 6,
-  },
-  summaryItem: {
-    fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  summaryPeople: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  summaryPeopleText: {
-    fontWeight: "600",
-  },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 12,
-  },
-  cardButton: {
-    flex: 1,
-    padding: 12,
-    backgroundColor: colors.warmSurface,
-    borderWidth: 1,
-    borderColor: colors.warmAccentSoft,
-    borderRadius: 8,
-    alignItems: "center",
-    marginHorizontal: 4,
-  },
-  reviewButton: {
-    backgroundColor: colors.warmAccentDark,
-    borderColor: colors.warmAccentDark,
-    marginHorizontal: 0,
-  },
-  reviewButtonDisabled: {
-    opacity: 0.6,
-  },
-  reviewButtonText: {
-    color: colors.background,
-    fontWeight: "700",
-  },
-  emptyText: {
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginTop: 24,
-    fontWeight: "600",
-  },
-});
-

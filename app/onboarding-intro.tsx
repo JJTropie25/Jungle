@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { Image, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "../lib/theme";
 
 export default function OnboardingIntro() {
   const router = useRouter();
@@ -24,7 +23,7 @@ export default function OnboardingIntro() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.screenBackground,
+    backgroundColor: "#0B3F3F",
     alignItems: "center",
     justifyContent: "center",
   },

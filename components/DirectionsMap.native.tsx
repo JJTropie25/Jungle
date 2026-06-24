@@ -1,5 +1,5 @@
 import MapView, { Marker, Polyline } from "react-native-maps";
-import { colors } from "../lib/theme";
+import { useTheme } from "../lib/theme-context";
 
 type LatLng = { latitude: number; longitude: number };
 
@@ -24,10 +24,13 @@ export default function DirectionsMapNative({
   microservice,
   destination,
 }: Props) {
+  const { colors } = useTheme();
+
   return (
     <MapView
       ref={mapRef}
       style={{ flex: 1 }}
+      showsBuildings={false}
       initialRegion={{
         latitude: destinationCoords.latitude,
         longitude: destinationCoords.longitude,

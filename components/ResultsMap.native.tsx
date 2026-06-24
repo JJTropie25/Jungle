@@ -48,7 +48,7 @@ export default function ResultsMap({
   }, [results, selectedTitle]);
 
   return (
-    <MapView ref={mapRef} style={styles.map} initialRegion={initialRegion}>
+    <MapView ref={mapRef} style={styles.map} initialRegion={initialRegion} showsBuildings={false}>
       {results.map((item) => (
         <Marker
           key={item.title}

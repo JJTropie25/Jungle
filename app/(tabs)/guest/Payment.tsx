@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,15 +7,174 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useI18n } from "../../../lib/i18n";
 import { useAuthState } from "../../../lib/auth";
 import { supabase } from "../../../lib/supabase";
-import { colors } from "../../../lib/theme";
+import { useTheme } from "../../../lib/theme-context";
+import { type ThemeColors } from "../../../lib/theme";
 import { useAppDialog } from "../../../components/AppDialogProvider";
 import { createPaymentIntent } from "../../../lib/stripe";
 import { useStripeClient } from "../../../lib/useStripeClient";
+
+const CATEGORY_COLORS: Record<string, string> = {
+  rest: "#1A4F8A",
+  shower: "#5BB5CC",
+  storage: "#C8930A",
+};
+const DEFAULT_HEADER_COLOR = "#4F9B9B";
+
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.screenBackground },
+
+    header: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 8,
+    },
+    headerBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerTitle: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: "#fff",
+    },
+
+    content: {
+      paddingHorizontal: 16,
+      paddingBottom: 32,
+    },
+    section: {
+      paddingVertical: 16,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: c.divider,
+    },
+
+    serviceName: {
+      fontSize: 20,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: c.textPrimary,
+    },
+    infoRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 10,
+    },
+    infoText: {
+      color: c.textSecondary,
+      fontSize: 14,
+      flex: 1,
+    },
+
+    priceRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    priceLabel: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: c.textSecondary,
+    },
+    priceValue: {
+      fontSize: 26,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: c.warmAccent,
+    },
+
+    sectionLabel: {
+      fontSize: 15,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: c.textPrimary,
+      marginBottom: 12,
+    },
+    methodRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      backgroundColor: c.surfaceSoft,
+      marginBottom: 10,
+      gap: 12,
+      borderWidth: 1.5,
+      borderColor: "transparent",
+    },
+    methodRowSelected: {
+      backgroundColor: c.warmSurface,
+      borderColor: c.warmAccent,
+    },
+    methodText: { flex: 1 },
+    methodLabel: {
+      fontWeight: "600",
+      color: c.textPrimary,
+      fontSize: 14,
+    },
+    methodHint: {
+      color: c.textSecondary,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    radio: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: c.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    radioSelected: { borderColor: c.warmAccent },
+    radioDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: c.warmAccent,
+    },
+
+    bookBar: {
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      backgroundColor: c.screenBackground,
+      borderTopWidth: 1,
+      borderTopColor: c.divider,
+    },
+    payButton: {
+      padding: 16,
+      backgroundColor: c.warmAccent,
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    payButtonDisabled: { backgroundColor: c.warmAccentSoft },
+    payButtonText: {
+      color: "#fff",
+      fontWeight: "600",
+      fontSize: 16,
+    },
+  });
+}
 
 export default function Payment() {
   const router = useRouter();
@@ -24,6 +183,9 @@ export default function Payment() {
   const { user } = useAuthState();
   const dialog = useAppDialog();
   const stripe = useStripeClient();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const {
     serviceId,
     slotStart,
@@ -33,6 +195,7 @@ export default function Payment() {
     people,
     microservice,
     selectedHour,
+    category,
   } = useLocalSearchParams<{
     serviceId?: string;
     slotStart?: string;
@@ -42,7 +205,10 @@ export default function Payment() {
     people?: string;
     microservice?: string;
     selectedHour?: string;
+    category?: string;
   }>();
+
+  const headerColor = (category && CATEGORY_COLORS[category]) ?? DEFAULT_HEADER_COLOR;
 
   const [method, setMethod] = useState<"card" | "cash">("cash");
   const [processing, setProcessing] = useState(false);
@@ -51,22 +217,23 @@ export default function Payment() {
 
   useEffect(() => {
     let mounted = true;
-    const loadPrice = async () => {
-      if (!supabase || !serviceId) return;
-      setLoadingPrice(true);
-      const { data } = await supabase
-        .from("services")
-        .select("price_eur")
-        .eq("id", serviceId)
-        .maybeSingle();
-      if (!mounted) return;
-      setPriceEur(Number(data?.price_eur ?? 0));
-      setLoadingPrice(false);
-    };
-    loadPrice().catch(() => setLoadingPrice(false));
-    return () => {
-      mounted = false;
-    };
+    if (!supabase || !serviceId) return;
+    setLoadingPrice(true);
+    const sb = supabase;
+    (async () => {
+      try {
+        const { data } = await sb
+          .from("services")
+          .select("price_eur")
+          .eq("id", serviceId)
+          .maybeSingle();
+        if (!mounted) return;
+        setPriceEur(Number(data?.price_eur ?? 0));
+      } finally {
+        if (mounted) setLoadingPrice(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, [serviceId]);
 
   const handlePay = async () => {
@@ -74,17 +241,13 @@ export default function Payment() {
       await dialog.alert(t("payment.title"), t("payment.supabaseMissing"));
       return;
     }
-    if (!user) {
-      router.replace("/(auth)/sign-in");
-      return;
-    }
+    if (!user) { router.replace("/(auth)/sign-in"); return; }
     if (!serviceId || !slotStart || !slotEnd) {
       await dialog.alert(t("payment.title"), t("payment.invalidData"));
       return;
     }
 
     setProcessing(true);
-
     const peopleCount = Number(people ?? 1) || 1;
     let paymentIntentId: string | null = null;
     let amountCents: number | null = null;
@@ -96,7 +259,6 @@ export default function Payment() {
         await dialog.alert(t("payment.title"), t("payment.cardNotAvailableWeb"));
         return;
       }
-      // Price and platform fee are computed server-side in Stripe function.
       const paymentIntent = await createPaymentIntent({
         service_id: serviceId,
         slot_start: slotStart,
@@ -104,13 +266,11 @@ export default function Payment() {
         people_count: peopleCount,
         currency: "eur",
       });
-
       if (!paymentIntent.client_secret || !paymentIntent.payment_intent_id) {
         setProcessing(false);
         await dialog.alert(t("payment.title"), paymentIntent.error ?? "Payment setup failed.");
         return;
       }
-
       const init = await stripe.initPaymentSheet({
         paymentIntentClientSecret: paymentIntent.client_secret,
         merchantDisplayName: "Lagoon",
@@ -121,21 +281,18 @@ export default function Payment() {
         await dialog.alert(t("payment.title"), init.error.message);
         return;
       }
-
       const present = await stripe.presentPaymentSheet();
       if (present.error) {
         setProcessing(false);
         await dialog.alert(t("payment.title"), present.error.message);
         return;
       }
-
       paymentIntentId = paymentIntent.payment_intent_id ?? null;
       amountCents = paymentIntent.amount_cents ?? null;
       platformFeeCents = paymentIntent.platform_fee_cents ?? null;
     }
 
     const qrToken = `BK-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    // Persist booking only after card confirmation (or immediately for cash method).
     const { data, error } = await supabase
       .from("bookings")
       .insert({
@@ -161,85 +318,110 @@ export default function Payment() {
       return;
     }
 
-    const methodLabel =
-      method === "card" ? t("payment.methodCard") : t("payment.methodCash");
-    await dialog.alert(
-      t("payment.successTitle"),
-      t("payment.successDetail", { method: methodLabel })
-    );
-
     router.replace({
       pathname: "/(tabs)/guest/BookingConfirmation",
-      params: {
-        bookingId: data.id,
-        qrToken,
-        destination,
-        timeslot,
-        people,
-        microservice,
-        selectedHour,
-      },
+      params: { bookingId: data.id, qrToken, destination, timeslot, people, microservice, selectedHour },
     });
   };
 
+  const displayTime = selectedHour ?? timeslot ?? "-";
+  const displayPeople = people ?? "1";
+
   return (
-    <SafeAreaView style={styles.screen}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.container,
-          { paddingTop: insets.top + 16 },
-        ]}
-      >
+    <View style={styles.screen}>
+
+      {/* Fixed header */}
+      <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: headerColor }]}>
         <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/guest"))}
+          style={styles.headerBtn}
+          onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/guest")}
         >
-          <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textPrimary} />
+          <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t("payment.title")}</Text>
+      </View>
 
-        <Text style={styles.title}>{t("payment.title")}</Text>
-        <Text style={styles.subtitle}>{t("payment.chooseMethod")}</Text>
+      {/* Scrollable content */}
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 64 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Service name */}
+        <View style={styles.section}>
+          <Text style={styles.serviceName}>{microservice ?? "-"}</Text>
+        </View>
+        <View style={styles.divider} />
 
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>{microservice ?? "-"}</Text>
-          <Text style={styles.summaryLine}>{destination ?? "-"}</Text>
-          <Text style={styles.summaryLine}>{timeslot ?? "-"}</Text>
-          <View style={styles.summaryPeople}>
-            <MaterialCommunityIcons
-              name="account-group"
-              size={16}
-              color={colors.textPrimary}
-            />
-            <Text style={styles.summaryPeopleText}>{people ?? "-"}</Text>
+        {/* Details */}
+        <View style={styles.section}>
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="map-marker-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.infoText}>{destination ?? "-"}</Text>
           </View>
-          <Text style={styles.summaryLine}>
-            {t("payment.selectedTime", { time: selectedHour ?? "-" })}
-          </Text>
-          <Text style={styles.summaryLine}>
-            {loadingPrice ? t("payment.loadingPrice") : `€${(priceEur ?? 0).toFixed(2)}`}
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="clock-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.infoText}>{displayTime}</Text>
+          </View>
+          <View style={[styles.infoRow, { marginBottom: 0 }]}>
+            <MaterialCommunityIcons name="account-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.infoText}>{displayPeople}</Text>
+          </View>
+        </View>
+        <View style={styles.divider} />
+
+        {/* Price */}
+        <View style={[styles.section, styles.priceRow]}>
+          <Text style={styles.priceLabel}>Totale</Text>
+          <Text style={styles.priceValue}>
+            {loadingPrice ? "…" : `€${(priceEur ?? 0).toFixed(2)}`}
           </Text>
         </View>
+        <View style={styles.divider} />
 
-        <View style={styles.methodColumn}>
+        {/* Payment method */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t("payment.chooseMethod")}</Text>
+
           <TouchableOpacity
-            style={[styles.methodCard, method === "card" && styles.methodCardSelected]}
+            style={[styles.methodRow, method === "card" && styles.methodRowSelected]}
             onPress={() => setMethod("card")}
           >
-            <MaterialCommunityIcons name="credit-card-outline" size={22} color={colors.textPrimary} />
-            <Text style={styles.methodTitle}>{t("payment.methodCard")}</Text>
-            <Text style={styles.methodHint}>{t("payment.availableNow")}</Text>
+            <MaterialCommunityIcons
+              name="credit-card-outline"
+              size={22}
+              color={method === "card" ? colors.warmAccent : colors.textSecondary}
+            />
+            <View style={styles.methodText}>
+              <Text style={styles.methodLabel}>{t("payment.methodCard")}</Text>
+              <Text style={styles.methodHint}>{t("payment.availableNow")}</Text>
+            </View>
+            <View style={[styles.radio, method === "card" && styles.radioSelected]}>
+              {method === "card" && <View style={styles.radioDot} />}
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.methodCard, method === "cash" && styles.methodCardSelected]}
+            style={[styles.methodRow, method === "cash" && styles.methodRowSelected]}
             onPress={() => setMethod("cash")}
           >
-            <MaterialCommunityIcons name="cash" size={22} color={colors.warmAccentDark} />
-            <Text style={styles.methodTitle}>{t("payment.methodCash")}</Text>
-            <Text style={styles.methodHint}>{t("payment.availableNow")}</Text>
+            <MaterialCommunityIcons
+              name="cash"
+              size={22}
+              color={method === "cash" ? colors.warmAccent : colors.textSecondary}
+            />
+            <View style={styles.methodText}>
+              <Text style={styles.methodLabel}>{t("payment.methodCash")}</Text>
+              <Text style={styles.methodHint}>{t("payment.availableNow")}</Text>
+            </View>
+            <View style={[styles.radio, method === "cash" && styles.radioSelected]}>
+              {method === "cash" && <View style={styles.radioDot} />}
+            </View>
           </TouchableOpacity>
         </View>
+      </ScrollView>
 
+      {/* Fixed pay button */}
+      <View style={[styles.bookBar, { paddingBottom: insets.bottom + 8 }]}>
         <TouchableOpacity
           style={[styles.payButton, processing && styles.payButtonDisabled]}
           onPress={handlePay}
@@ -249,106 +431,8 @@ export default function Payment() {
             {processing ? t("payment.processing") : t("payment.payNow")}
           </Text>
         </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.screenBackground },
-  container: { padding: 16, paddingBottom: 24 },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.surface,
-  },
-  subtitle: {
-    marginTop: 8,
-    color: colors.surface,
-    marginBottom: 14,
-  },
-  summaryCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.24,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 7,
-  },
-  summaryTitle: {
-    fontWeight: "700",
-    color: colors.textPrimary,
-    marginBottom: 6,
-  },
-  summaryLine: {
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  summaryPeople: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 2,
-  },
-  summaryPeopleText: {
-    color: colors.textSecondary,
-    fontWeight: "600",
-  },
-  payButton: {
-    backgroundColor: colors.textPrimary,
-    borderRadius: 10,
-    padding: 16,
-    alignItems: "center",
-  },
-  payButtonDisabled: {
-    backgroundColor: colors.textMuted,
-  },
-  payButtonText: {
-    color: colors.background,
-    fontWeight: "700",
-  },
-  methodColumn: {
-    gap: 10,
-    marginBottom: 18,
-  },
-  methodCard: {
-    width: "100%",
-    borderRadius: 12,
-    backgroundColor: colors.surfaceSoft,
-    padding: 14,
-    gap: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.24,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 7,
-  },
-  methodCardSelected: {
-    borderColor: colors.warmAccent,
-    backgroundColor: colors.warmSurface,
-    borderWidth: 1,
-  },
-  methodTitle: {
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  methodHint: {
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-});
-
-
-

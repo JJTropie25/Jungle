@@ -1,24 +1,26 @@
 import { Tabs } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { View } from "react-native";
 import { useI18n } from "../../lib/i18n";
-import { colors } from "../../lib/theme";
+import { useTheme } from "../../lib/theme-context";
 
 export default function TabsLayout() {
   const { t, language } = useI18n();
+  const { colors } = useTheme();
   return (
     <Tabs
       key={language}
       screenOptions={{
         headerShown: false,
         detachInactiveScreens: true,
-        sceneStyle: { backgroundColor: "#0B3F3F" },
+        sceneStyle: { backgroundColor: colors.screenBackground },
         tabBarStyle: {
-          backgroundColor: "#4F9B9B",
-          borderTopColor: "rgba(15,78,78,0.4)",
+          backgroundColor: colors.screenBackground,
+          borderTopColor: colors.divider,
+          height: 64,
+          paddingBottom: 8,
         },
-        tabBarActiveTintColor: colors.surface,
-        tabBarInactiveTintColor: colors.surface,
+        tabBarActiveTintColor: colors.warmAccent,
+        tabBarInactiveTintColor: colors.textPrimary,
         tabBarLabelStyle: {
           fontWeight: "600",
         },
@@ -28,28 +30,12 @@ export default function TabsLayout() {
         name="guest"
         options={{
           title: t("tabs.home"),
-          tabBarIcon: ({ size, focused }) => (
-            focused ? (
-              <View>
-                <MaterialCommunityIcons
-                  name="home-variant"
-                  size={Math.max(22, size)}
-                  color={colors.surfaceSoft}
-                />
-                <MaterialCommunityIcons
-                  name="home-outline"
-                  size={Math.max(22, size)}
-                  color={colors.surface}
-                  style={{ position: "absolute", top: 0, left: 0 }}
-                />
-              </View>
-            ) : (
-              <MaterialCommunityIcons
-                name="home-outline"
-                size={Math.max(22, size)}
-                color={colors.surface}
-              />
-            )
+          tabBarIcon: ({ size, focused, color }) => (
+            <MaterialCommunityIcons
+              name={focused ? "home-variant" : "home-outline"}
+              size={Math.max(22, size)}
+              color={color}
+            />
           ),
         }}
       />
@@ -57,28 +43,12 @@ export default function TabsLayout() {
         name="favorites"
         options={{
           title: t("tabs.favourites"),
-          tabBarIcon: ({ size, focused }) => (
-            focused ? (
-              <View>
-                <MaterialCommunityIcons
-                  name="star"
-                  size={Math.max(22, size)}
-                  color={colors.surfaceSoft}
-                />
-                <MaterialCommunityIcons
-                  name="star-outline"
-                  size={Math.max(22, size)}
-                  color={colors.surface}
-                  style={{ position: "absolute", top: 0, left: 0 }}
-                />
-              </View>
-            ) : (
-              <MaterialCommunityIcons
-                name="star-outline"
-                size={Math.max(22, size)}
-                color={colors.surface}
-              />
-            )
+          tabBarIcon: ({ size, focused, color }) => (
+            <MaterialCommunityIcons
+              name={focused ? "star" : "star-outline"}
+              size={Math.max(22, size)}
+              color={color}
+            />
           ),
         }}
       />
@@ -86,28 +56,12 @@ export default function TabsLayout() {
         name="bookings"
         options={{
           title: t("tabs.bookings"),
-          tabBarIcon: ({ size, focused }) => (
-            focused ? (
-              <View>
-                <MaterialCommunityIcons
-                  name="briefcase"
-                  size={Math.max(22, size)}
-                  color={colors.surfaceSoft}
-                />
-                <MaterialCommunityIcons
-                  name="briefcase-outline"
-                  size={Math.max(22, size)}
-                  color={colors.surface}
-                  style={{ position: "absolute", top: 0, left: 0 }}
-                />
-              </View>
-            ) : (
-              <MaterialCommunityIcons
-                name="briefcase-outline"
-                size={Math.max(22, size)}
-                color={colors.surface}
-              />
-            )
+          tabBarIcon: ({ size, focused, color }) => (
+            <MaterialCommunityIcons
+              name={focused ? "briefcase" : "briefcase-outline"}
+              size={Math.max(22, size)}
+              color={color}
+            />
           ),
         }}
       />
@@ -115,47 +69,16 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: t("tabs.profile"),
-          tabBarIcon: ({ size, focused }) => (
-            focused ? (
-              <View>
-                <MaterialCommunityIcons
-                  name="account-circle"
-                  size={Math.max(22, size)}
-                  color={colors.surfaceSoft}
-                />
-                <MaterialCommunityIcons
-                  name="account-circle-outline"
-                  size={Math.max(22, size)}
-                  color={colors.surface}
-                  style={{ position: "absolute", top: 0, left: 0 }}
-                />
-              </View>
-            ) : (
-              <MaterialCommunityIcons
-                name="account-circle-outline"
-                size={Math.max(22, size)}
-                color={colors.surface}
-              />
-            )
+          tabBarIcon: ({ size, focused, color }) => (
+            <MaterialCommunityIcons
+              name={focused ? "account-circle" : "account-circle-outline"}
+              size={Math.max(22, size)}
+              color={color}
+            />
           ),
         }}
       />
-      <Tabs.Screen
-        name="profile/Edit"
-        options={{
-          href: null,
-          tabBarStyle: { display: "none" },
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="profile/Language"
-        options={{
-          href: null,
-          tabBarStyle: { display: "none" },
-          headerShown: false,
-        }}
-      />
+
     </Tabs>
   );
 }

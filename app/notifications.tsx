@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   Pressable,
   Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import TabTopNotch from "../components/TabTopNotch";
-import { colors } from "../lib/theme";
+import { useTheme } from "../lib/theme-context";
+import { type ThemeColors } from "../lib/theme";
 import { useI18n } from "../lib/i18n";
 import { useAuthState } from "../lib/auth";
 import {
@@ -28,7 +28,6 @@ function humanizeEtaMinutes(totalMinutes: number): string {
   const days = Math.floor(minutes / 1440);
   const hours = Math.floor((minutes % 1440) / 60);
   const mins = minutes % 60;
-
   const parts: string[] = [];
   if (days > 0) parts.push(`${days} day${days === 1 ? "" : "s"}`);
   if (hours > 0) parts.push(`${hours} h`);
@@ -49,10 +48,105 @@ function normalizeNotificationBody(body: string | null, data: any | null): strin
   return `New guest arrives in ${humanizeEtaMinutes(parsed)}`;
 }
 
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.screenBackground },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+      gap: 10,
+      backgroundColor: "#4F9B9B",
+    },
+    backButton: { padding: 4 },
+    title: {
+      flex: 1,
+      fontSize: 20,
+      fontWeight: "600",
+      color: "#fff",
+    },
+    markAll: { paddingHorizontal: 8, paddingVertical: 6 },
+    markAllText: {
+      color: "rgba(255,255,255,0.65)",
+      fontWeight: "600",
+      fontSize: 12,
+    },
+    scrollContent: { padding: 16, paddingBottom: 32 },
+    notifBox: {
+      backgroundColor: c.cardBackground,
+      borderRadius: 12,
+      overflow: "hidden",
+    },
+    row: { paddingHorizontal: 16, paddingVertical: 14 },
+    rowUnread: { backgroundColor: "rgba(255,179,107,0.14)" },
+    rowInner: { gap: 4 },
+    unreadDot: {
+      position: "absolute",
+      right: 0,
+      top: 2,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: c.warmAccent,
+    },
+    separator: {
+      height: 1,
+      backgroundColor: c.divider,
+      marginHorizontal: 16,
+    },
+    cardTitle: {
+      fontWeight: "600",
+      color: c.textPrimary,
+      paddingRight: 16,
+    },
+    cardBody: {
+      color: c.textPrimary,
+      fontSize: 13,
+    },
+    cardTime: {
+      color: c.textSecondary,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    emptyText: {
+      color: "rgba(255,255,255,0.6)",
+      fontWeight: "600",
+      marginTop: 20,
+      textAlign: "center",
+    },
+    permissionCard: {
+      backgroundColor: "rgba(255,255,255,0.08)",
+      borderRadius: 12,
+      padding: 12,
+      gap: 8,
+      marginBottom: 16,
+    },
+    permissionTitle: { fontWeight: "600", color: "#fff" },
+    permissionBody: { color: "rgba(255,255,255,0.65)" },
+    permissionButton: {
+      alignSelf: "flex-start",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 10,
+      backgroundColor: c.warmAccent,
+    },
+    permissionButtonText: {
+      color: c.background,
+      fontWeight: "600",
+    },
+    disabled: { opacity: 0.5 },
+  });
+}
+
 export default function NotificationsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { user } = useAuthState();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [needsPermission, setNeedsPermission] = useState(false);
@@ -71,7 +165,6 @@ export default function NotificationsScreen() {
   }, [user?.id]);
 
   useEffect(() => {
-    // Reload list when user changes; manual refresh handles read state updates.
     loadNotifications().catch(() => setLoading(false));
   }, [loadNotifications]);
 
@@ -88,28 +181,28 @@ export default function NotificationsScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <TabTopNotch hideBell />
-      <View style={styles.container}>
-        <View style={styles.headerRow}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <MaterialCommunityIcons
-              name="chevron-left"
-              size={24}
-              color={colors.surface}
-            />
-          </Pressable>
-          <Text style={styles.title}>{t("notifications.title")}</Text>
-          <Pressable
-            style={styles.markAll}
-            onPress={async () => {
-              await markAllNotificationsRead(user?.id);
-              loadNotifications().catch(() => null);
-            }}
-          >
-            <Text style={styles.markAllText}>{t("notifications.markAll")}</Text>
-          </Pressable>
-        </View>
+    <SafeAreaView style={styles.screen} edges={["bottom"]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#fff" />
+        </Pressable>
+        <Text style={styles.title}>{t("notifications.title")}</Text>
+        <Pressable
+          style={styles.markAll}
+          onPress={async () => {
+            await markAllNotificationsRead(user?.id);
+            loadNotifications().catch(() => null);
+          }}
+        >
+          <Text style={styles.markAllText}>{t("notifications.markAll")}</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {needsPermission ? (
           <View style={styles.permissionCard}>
             <Text style={styles.permissionTitle}>{t("notifications.permissionTitle")}</Text>
@@ -140,141 +233,37 @@ export default function NotificationsScreen() {
         ) : items.length === 0 ? (
           <Text style={styles.emptyText}>{t("notifications.empty")}</Text>
         ) : (
-          <FlatList
-            data={items}
-            keyExtractor={(item) => item.id}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => {
+          <View style={styles.notifBox}>
+            {items.map((item, index) => {
               const unread = !item.read_at;
               const body = normalizeNotificationBody(item.body, item.data);
               return (
-                <Pressable
-                  style={[styles.row, unread && styles.rowUnread]}
-                  onPress={async () => {
-                    if (unread) {
-                      await markNotificationRead(item.id);
-                      loadNotifications().catch(() => null);
-                    }
-                  }}
-                >
-                  <View style={styles.rowInner}>
-                    <Text style={styles.cardTitle}>{item.title}</Text>
-                    {body ? (
-                      <Text style={styles.cardBody}>{body}</Text>
-                    ) : null}
-                    <Text style={styles.cardTime}>
-                      {new Date(item.created_at).toLocaleString()}
-                    </Text>
-                  </View>
-                </Pressable>
+                <View key={item.id}>
+                  {index > 0 && <View style={styles.separator} />}
+                  <Pressable
+                    style={[styles.row, unread && styles.rowUnread]}
+                    onPress={async () => {
+                      if (unread) {
+                        await markNotificationRead(item.id);
+                        loadNotifications().catch(() => null);
+                      }
+                    }}
+                  >
+                    <View style={styles.rowInner}>
+                      {unread && <View style={styles.unreadDot} />}
+                      <Text style={styles.cardTitle}>{item.title}</Text>
+                      {body ? <Text style={styles.cardBody}>{body}</Text> : null}
+                      <Text style={styles.cardTime}>
+                        {new Date(item.created_at).toLocaleString()}
+                      </Text>
+                    </View>
+                  </Pressable>
+                </View>
               );
-            }}
-          />
+            })}
+          </View>
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  container: {
-    flex: 1,
-    paddingTop: 60,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-  },
-  title: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 20,
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  markAll: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  markAllText: {
-    color: colors.textPrimary,
-    fontWeight: "600",
-    fontSize: 12,
-  },
-  permissionCard: {
-    backgroundColor: "#F1FAFA",
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-    marginBottom: 12,
-  },
-  permissionTitle: {
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  permissionBody: {
-    color: colors.textSecondary,
-  },
-  permissionButton: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: colors.warmAccent,
-  },
-  permissionButtonText: {
-    color: colors.background,
-    fontWeight: "700",
-  },
-  listContent: {
-    paddingBottom: 24,
-  },
-  cardTitle: {
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  cardBody: {
-    color: colors.textPrimary,
-  },
-  cardTime: {
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-  emptyText: {
-    color: colors.textPrimary,
-    fontWeight: "600",
-    marginTop: 20,
-  },
-  row: {
-    width: "100%",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: colors.background,
-  },
-  rowUnread: {
-    backgroundColor: "#FFB36B",
-  },
-  rowInner: {
-    gap: 6,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: "rgba(15,78,78,0.18)",
-    marginLeft: 16,
-    marginRight: 16,
-  },
-});

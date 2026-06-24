@@ -1,13 +1,49 @@
 import { View, Text, StyleSheet, Pressable } from "react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { useAuthState } from "../lib/auth";
 import { supabase } from "../lib/supabase";
-import { colors } from "../lib/theme";
+import { useTheme } from "../lib/theme-context";
+import { type ThemeColors } from "../lib/theme";
+
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.screenBackground,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 24,
+      gap: 12,
+    },
+    title: {
+      color: c.surface,
+      fontSize: 22,
+      fontWeight: "600",
+    },
+    body: {
+      color: c.surface,
+      textAlign: "center",
+    },
+    button: {
+      marginTop: 12,
+      backgroundColor: c.warmAccent,
+      paddingVertical: 12,
+      paddingHorizontal: 18,
+      borderRadius: 10,
+    },
+    buttonText: {
+      color: c.background,
+      fontWeight: "600",
+    },
+  });
+}
 
 export default function HostOnboarding() {
   const router = useRouter();
   const { user } = useAuthState();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [status, setStatus] = useState<"loading" | "active" | "inactive">("loading");
 
   useEffect(() => {
@@ -47,34 +83,3 @@ export default function HostOnboarding() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.screenBackground,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    gap: 12,
-  },
-  title: {
-    color: colors.surface,
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  body: {
-    color: colors.surface,
-    textAlign: "center",
-  },
-  button: {
-    marginTop: 12,
-    backgroundColor: colors.warmAccent,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-  },
-  buttonText: {
-    color: colors.background,
-    fontWeight: "700",
-  },
-});

@@ -4,6 +4,12 @@ const googleGeocodingKey =
 const googlePlacesKey =
   process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY?.trim() ?? googleGeocodingKey;
 
+// Remove leading postal/ZIP codes that Google sometimes prepends (e.g. "86100 Campobasso, ...")
+function cleanLabel(raw: string): string {
+  return raw.replace(/^\d{4,7}[\s,]+/, "").trim();
+}
+
+
 export type PlaceSuggestion = {
   label: string;
   latitude: number;
@@ -35,9 +41,9 @@ async function googleGeocodeSearch(query: string, limit: number): Promise<PlaceS
     .map((result) => {
       const latitude = result.geometry?.location?.lat;
       const longitude = result.geometry?.location?.lng;
-      const label = result.formatted_address?.trim();
+      const label = cleanLabel(result.formatted_address?.trim() ?? "");
       if (!label || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-      return { label, latitude, longitude } satisfies PlaceSuggestion;
+      return { label, latitude: latitude as number, longitude: longitude as number } satisfies PlaceSuggestion;
     })
     .filter((item): item is PlaceSuggestion => Boolean(item));
 }
@@ -51,7 +57,7 @@ async function googlePlacesAutocomplete(
     `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
       query
     )}` +
-    `&types=geocode&key=${encodeURIComponent(googlePlacesKey)}`;
+    `&types=%28cities%29&language=it&key=${encodeURIComponent(googlePlacesKey)}`;
   const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
   if (!res.ok) return [];
   const payload = (await res.json()) as {
@@ -91,12 +97,12 @@ async function googlePlacesAutocomplete(
         return null;
       }
       const label =
-        detailsPayload.result?.formatted_address?.trim() ??
-        prediction.description?.trim();
+        prediction.description?.trim() ??
+        detailsPayload.result?.formatted_address?.trim();
       const latitude = detailsPayload.result?.geometry?.location?.lat;
       const longitude = detailsPayload.result?.geometry?.location?.lng;
       if (!label || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-      return { label, latitude, longitude } satisfies PlaceSuggestion;
+      return { label, latitude: latitude as number, longitude: longitude as number } satisfies PlaceSuggestion;
     })
   );
 

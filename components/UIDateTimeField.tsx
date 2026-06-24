@@ -9,8 +9,10 @@ import {
   View,
   ViewStyle,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { colors } from "../lib/theme";
+import { useTheme } from "../lib/theme-context";
+import { type ThemeColors } from "../lib/theme";
 
 type Props = {
   placeholder: string;
@@ -18,6 +20,10 @@ type Props = {
   mode: "date" | "time";
   onChange: (value: string) => void;
   fieldStyle?: ViewStyle;
+  textColor?: string;
+  placeholderColor?: string;
+  label?: string;
+  accentColor?: string;
 };
 
 function formatDate(date: Date) {
@@ -27,35 +33,240 @@ function formatDate(date: Date) {
   return `${y}-${m}-${d}`;
 }
 
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    fieldLabel: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: c.textPrimary,
+    },
+    fieldHint: {
+      fontSize: 14,
+      color: c.textMuted,
+    },
+    field: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 8,
+      padding: 12,
+      backgroundColor: c.background,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    label: {
+      color: c.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    placeholder: {
+      color: c.textMuted,
+      fontWeight: "600",
+    },
+    fsHeader: {
+      paddingHorizontal: 20,
+      paddingBottom: 16,
+    },
+    fsHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 8,
+    },
+    fsCloseBtn: {
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    fsHeaderTitle: {
+      color: "#fff",
+      fontSize: 18,
+      fontWeight: "600",
+    },
+    fsMonthNav: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 4,
+    },
+    fsMonthLabel: {
+      color: "#fff",
+      fontWeight: "600",
+      fontSize: 16,
+    },
+    fsBody: {
+      flex: 1,
+      backgroundColor: c.background,
+      padding: 16,
+    },
+    navButton: {
+      width: 36,
+      height: 36,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    navButtonDisabled: {
+      opacity: 0.45,
+    },
+    weekRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 8,
+    },
+    weekLabel: {
+      width: "14.28%",
+      textAlign: "center",
+      color: c.textMuted,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    grid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+    },
+    dayCell: {
+      width: "14.28%",
+      aspectRatio: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 4,
+    },
+    dayLabel: {
+      color: c.textPrimary,
+      fontWeight: "600",
+      fontSize: 15,
+    },
+    dayCellDisabled: {
+      opacity: 0.35,
+    },
+    dayLabelDisabled: {
+      color: c.textMuted,
+    },
+    timePicker: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    timeTitle: {
+      fontWeight: "600",
+      color: c.textPrimary,
+      marginBottom: 24,
+      fontSize: 16,
+    },
+    timeColumns: {
+      flexDirection: "row",
+      gap: 10,
+      alignItems: "center",
+      zIndex: 1,
+    },
+    timeWheelWrap: {
+      position: "relative",
+      alignSelf: "center",
+    },
+    timeWheelBox: {
+      position: "relative",
+      width: 82,
+      height: 156,
+      borderRadius: 10,
+      overflow: "hidden",
+      backgroundColor: c.background,
+    },
+    timeWheel: {
+      height: "100%",
+      width: "100%",
+      backgroundColor: "transparent",
+      zIndex: 2,
+    },
+    timeWheelContent: {
+      paddingVertical: 52,
+    },
+    timeWheelItem: {
+      height: 52,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 8,
+      backgroundColor: "transparent",
+      zIndex: 3,
+    },
+    timeSeparator: {
+      fontSize: 20,
+      fontWeight: "600",
+      color: c.textPrimary,
+    },
+    timeLabel: {
+      color: "#111111",
+      fontWeight: "600",
+    },
+    timeCenterHighlight: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: 52,
+      height: 52,
+      borderRadius: 10,
+      backgroundColor: c.surfaceSoft,
+      zIndex: 1,
+    },
+    done: {
+      marginTop: 32,
+      alignSelf: "center",
+      paddingVertical: 13,
+      paddingHorizontal: 48,
+      borderRadius: 10,
+    },
+    doneText: {
+      color: "#fff",
+      fontWeight: "600",
+      fontSize: 16,
+    },
+    webHiddenInput: {
+      position: "absolute",
+      width: 1,
+      height: 1,
+      opacity: 0,
+      pointerEvents: "none",
+    },
+  });
+}
+
 export default function UIDateTimeField({
   placeholder,
   value,
   mode,
   onChange,
   fieldStyle,
+  textColor,
+  placeholderColor,
+  label,
+  accentColor,
 }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => new Date());
   const [draftTime, setDraftTime] = useState({ h: "00", m: "00" });
   const hourRef = useRef<ScrollView>(null);
   const minuteRef = useRef<ScrollView>(null);
   const webInputRef = useRef<HTMLInputElement | null>(null);
+  const insets = useSafeAreaInsets();
   const wheelItemHeight = 52;
   const wheelRepeat = 5;
   const icon = mode === "date" ? "calendar-month" : "clock-outline";
+  const headerColor = accentColor ?? colors.textPrimary;
+
   const selectedDate = useMemo(() => {
     if (!value || mode !== "date") return null;
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }, [mode, value]);
+
   const hours = useMemo(
     () => Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")),
     []
   );
-  const minutes = useMemo(
-    () => ["00", "15", "30", "45"],
-    []
-  );
+  const minutes = useMemo(() => ["00", "15", "30", "45"], []);
+
   const selectedTime = useMemo(() => {
     if (!value || mode !== "time") return { h: "00", m: "00" };
     const [h, m] = value.split(":");
@@ -64,6 +275,7 @@ export default function UIDateTimeField({
       m: minutes.includes(m) ? m : "00",
     };
   }, [hours, minutes, mode, value]);
+
   const cyclicHours = useMemo(
     () =>
       Array.from(
@@ -107,14 +319,17 @@ export default function UIDateTimeField({
     const month = viewDate.toLocaleString("default", { month: "long" });
     return `${month} ${viewDate.getFullYear()}`;
   }, [viewDate]);
+
   const todayStart = useMemo(() => {
     const t = new Date();
     return new Date(t.getFullYear(), t.getMonth(), t.getDate());
   }, []);
+
   const currentMonthStart = useMemo(
     () => new Date(todayStart.getFullYear(), todayStart.getMonth(), 1),
     [todayStart]
   );
+
   const prevMonthDisabled =
     new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1) <
     currentMonthStart;
@@ -134,7 +349,7 @@ export default function UIDateTimeField({
 
   if (Platform.OS === "web") {
     return (
-      <View>
+      <View style={{ flex: 1 }}>
         <Pressable
           style={[styles.field, fieldStyle]}
           onPress={() => {
@@ -148,10 +363,30 @@ export default function UIDateTimeField({
             }
           }}
         >
-          <MaterialCommunityIcons name={icon} size={18} color={colors.textSecondary} />
-          <Text style={[styles.label, !value && styles.placeholder]}>
-            {value || placeholder}
-          </Text>
+          <MaterialCommunityIcons name={icon} size={18} color={textColor ?? colors.textSecondary} />
+          <View style={{ flex: 1 }}>
+            {label && !value ? (
+              <>
+                <Text style={[styles.fieldLabel, textColor ? { color: textColor } : undefined]}>
+                  {label}
+                </Text>
+                <Text style={[styles.fieldHint, placeholderColor ? { color: placeholderColor } : undefined]}>
+                  {placeholder}
+                </Text>
+              </>
+            ) : (
+              <Text
+                style={[
+                  styles.label,
+                  !value && styles.placeholder,
+                  value && textColor ? { color: textColor } : undefined,
+                  !value && placeholderColor ? { color: placeholderColor } : undefined,
+                ]}
+              >
+                {value || placeholder}
+              </Text>
+            )}
+          </View>
         </Pressable>
         <input
           ref={webInputRef}
@@ -169,65 +404,120 @@ export default function UIDateTimeField({
   }
 
   return (
-    <View>
-      <Pressable
-        style={[styles.field, fieldStyle]}
-        onPress={() => {
-          if (mode === "date") {
-            setViewDate(selectedDate ?? new Date());
-          }
-          setOpen(true);
-        }}
-      >
-        <MaterialCommunityIcons name={icon} size={18} color={colors.textSecondary} />
-        <Text style={[styles.label, !value && styles.placeholder]}>
-          {value || placeholder}
-        </Text>
-      </Pressable>
+    <View style={{ flex: 1 }}>
+      <View style={[styles.field, fieldStyle]}>
+        <Pressable
+          style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}
+          onPress={() => {
+            if (mode === "date") {
+              setViewDate(selectedDate ?? new Date());
+            }
+            setOpen(true);
+          }}
+        >
+          <MaterialCommunityIcons name={icon} size={18} color={textColor ?? colors.textSecondary} />
+          <View style={{ flex: 1 }}>
+            {label && !value ? (
+              <>
+                <Text style={[styles.fieldLabel, textColor ? { color: textColor } : undefined]}>
+                  {label}
+                </Text>
+                <Text style={[styles.fieldHint, placeholderColor ? { color: placeholderColor } : undefined]}>
+                  {placeholder}
+                </Text>
+              </>
+            ) : (
+              <Text
+                style={[
+                  styles.label,
+                  !value && styles.placeholder,
+                  value && textColor ? { color: textColor } : undefined,
+                  !value && placeholderColor ? { color: placeholderColor } : undefined,
+                ]}
+              >
+                {value || placeholder}
+              </Text>
+            )}
+          </View>
+        </Pressable>
+        {value ? (
+          <Pressable
+            onPress={() => onChange("")}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <MaterialCommunityIcons
+              name="close-circle"
+              size={16}
+              color={placeholderColor ?? colors.textSecondary}
+            />
+          </Pressable>
+        ) : (
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={18}
+            color={placeholderColor ?? colors.textSecondary}
+          />
+        )}
+      </View>
+
       <Modal
-        transparent
         visible={open}
-        animationType="fade"
+        animationType="slide"
         statusBarTranslucent
+        onRequestClose={() => setOpen(false)}
       >
-        <View style={styles.backdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
-          <View style={styles.modalCard}>
+        <View style={{ flex: 1 }}>
+          {/* Colored header */}
+          <View
+            style={[
+              styles.fsHeader,
+              { backgroundColor: headerColor, paddingTop: insets.top + 12 },
+            ]}
+          >
+            <View style={styles.fsHeaderRow}>
+              <Pressable style={styles.fsCloseBtn} onPress={() => setOpen(false)}>
+                <MaterialCommunityIcons name="chevron-down" size={28} color="#fff" />
+              </Pressable>
+              <Text style={styles.fsHeaderTitle}>{label || placeholder}</Text>
+              <View style={{ width: 44 }} />
+            </View>
+            {mode === "date" && (
+              <View style={styles.fsMonthNav}>
+                <Pressable
+                  style={[styles.navButton, prevMonthDisabled && styles.navButtonDisabled]}
+                  disabled={prevMonthDisabled}
+                  onPress={() => {
+                    if (prevMonthDisabled) return;
+                    setViewDate(
+                      (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                    );
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name="chevron-left"
+                    size={22}
+                    color={prevMonthDisabled ? "rgba(255,255,255,0.35)" : "#fff"}
+                  />
+                </Pressable>
+                <Text style={styles.fsMonthLabel}>{monthLabel}</Text>
+                <Pressable
+                  style={styles.navButton}
+                  onPress={() =>
+                    setViewDate(
+                      (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                    )
+                  }
+                >
+                  <MaterialCommunityIcons name="chevron-right" size={22} color="#fff" />
+                </Pressable>
+              </View>
+            )}
+          </View>
+
+          {/* White body */}
+          <View style={styles.fsBody}>
             {mode === "date" ? (
-              <View>
-                <View style={styles.modalHeader}>
-                  <Pressable
-                    style={[styles.navButton, prevMonthDisabled && styles.navButtonDisabled]}
-                    disabled={prevMonthDisabled}
-                    onPress={() => {
-                      if (prevMonthDisabled) return;
-                      setViewDate(
-                        (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
-                      );
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name="chevron-left"
-                      size={20}
-                      color={prevMonthDisabled ? colors.textMuted : colors.textPrimary}
-                    />
-                  </Pressable>
-                  <Text style={styles.monthLabel}>{monthLabel}</Text>
-                  <Pressable
-                    style={styles.navButton}
-                    onPress={() =>
-                      setViewDate(
-                        (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
-                      )
-                    }
-                  >
-                    <MaterialCommunityIcons
-                      name="chevron-right"
-                      size={20}
-                      color={colors.textPrimary}
-                    />
-                  </Pressable>
-                </View>
+              <>
                 <View style={styles.weekRow}>
                   {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
                     <Text key={d} style={styles.weekLabel}>
@@ -253,19 +543,17 @@ export default function UIDateTimeField({
                       <Pressable
                         key={index}
                         disabled={isPastDate}
-                        style={[
+                        style={({ pressed }) => [
                           styles.dayCell,
                           isPastDate && styles.dayCellDisabled,
-                          isSelected && styles.daySelected,
+                          isSelected
+                            ? { backgroundColor: headerColor, borderRadius: 18 }
+                            : pressed
+                            ? { backgroundColor: headerColor + "28", borderRadius: 18 }
+                            : undefined,
                         ]}
                         onPress={() => {
-                          if (isPastDate) return;
-                          const next = new Date(
-                            viewDate.getFullYear(),
-                            viewDate.getMonth(),
-                            day
-                          );
-                          onChange(formatDate(next));
+                          onChange(formatDate(candidate));
                           setOpen(false);
                         }}
                       >
@@ -273,7 +561,7 @@ export default function UIDateTimeField({
                           style={[
                             styles.dayLabel,
                             isPastDate && styles.dayLabelDisabled,
-                            isSelected && styles.dayLabelSelected,
+                            isSelected ? { color: "#fff" } : undefined,
                           ]}
                         >
                           {day}
@@ -282,9 +570,9 @@ export default function UIDateTimeField({
                     );
                   })}
                 </View>
-              </View>
+              </>
             ) : (
-              <View>
+              <View style={styles.timePicker}>
                 <Text style={styles.timeTitle}>Select time</Text>
                 <View style={styles.timeWheelWrap}>
                   <View style={styles.timeColumns}>
@@ -318,9 +606,7 @@ export default function UIDateTimeField({
                       >
                         {cyclicHours.map((h, i) => (
                           <View key={`${h}-${i}`} style={styles.timeWheelItem}>
-                            <Text style={styles.timeLabel}>
-                              {h}
-                            </Text>
+                            <Text style={styles.timeLabel}>{h}</Text>
                           </View>
                         ))}
                       </ScrollView>
@@ -357,9 +643,7 @@ export default function UIDateTimeField({
                       >
                         {cyclicMinutes.map((m, i) => (
                           <View key={`${m}-${i}`} style={styles.timeWheelItem}>
-                            <Text style={styles.timeLabel}>
-                              {m}
-                            </Text>
+                            <Text style={styles.timeLabel}>{m}</Text>
                           </View>
                         ))}
                       </ScrollView>
@@ -368,7 +652,7 @@ export default function UIDateTimeField({
                   </View>
                 </View>
                 <Pressable
-                  style={styles.done}
+                  style={[styles.done, { backgroundColor: headerColor }]}
                   onPress={() => {
                     onChange(`${draftTime.h}:${draftTime.m}`);
                     setOpen(false);
@@ -384,178 +668,3 @@ export default function UIDateTimeField({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  field: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: colors.background,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  label: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  placeholder: {
-    color: colors.textMuted,
-    fontWeight: "700",
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    padding: 24,
-    justifyContent: "center",
-  },
-  modalCard: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 16,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  navButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceSoft,
-  },
-  navButtonDisabled: {
-    opacity: 0.55,
-  },
-  monthLabel: {
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  weekRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  weekLabel: {
-    width: "14.28%",
-    textAlign: "center",
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  dayCell: {
-    width: "14.28%",
-    aspectRatio: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-  },
-  dayLabel: {
-    color: colors.textPrimary,
-    fontWeight: "600",
-  },
-  dayCellDisabled: {
-    opacity: 0.45,
-  },
-  dayLabelDisabled: {
-    color: colors.textMuted,
-  },
-  daySelected: {
-    backgroundColor: colors.textPrimary,
-    borderRadius: 18,
-  },
-  dayLabelSelected: {
-    color: colors.background,
-  },
-  timeTitle: {
-    fontWeight: "700",
-    color: colors.textPrimary,
-    marginBottom: 12,
-  },
-  timeColumns: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-    zIndex: 1,
-  },
-  timeWheelWrap: {
-    position: "relative",
-    alignSelf: "center",
-  },
-  timeWheelBox: {
-    position: "relative",
-    width: 82,
-    height: 156,
-    borderRadius: 10,
-    overflow: "hidden",
-    backgroundColor: colors.background,
-  },
-  timeWheel: {
-    height: "100%",
-    width: "100%",
-    backgroundColor: "transparent",
-    zIndex: 2,
-  },
-  timeWheelContent: {
-    paddingVertical: 52,
-  },
-  timeWheelItem: {
-    height: 52,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
-    backgroundColor: "transparent",
-    opacity: 1,
-    zIndex: 3,
-  },
-  timeSeparator: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  timeLabel: {
-    color: "#111111",
-    fontWeight: "600",
-  },
-  timeCenterHighlight: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 52,
-    height: 52,
-    borderRadius: 10,
-    backgroundColor: colors.surfaceSoft,
-    opacity: 1,
-    zIndex: 1,
-  },
-  done: {
-    marginTop: 12,
-    alignSelf: "flex-end",
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    backgroundColor: colors.textPrimary,
-    borderRadius: 8,
-  },
-  doneText: {
-    color: colors.background,
-    fontWeight: "600",
-  },
-  webHiddenInput: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    opacity: 0,
-    pointerEvents: "none",
-  },
-});
