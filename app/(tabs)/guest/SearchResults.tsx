@@ -6,8 +6,8 @@ import {
   FlatList,
   Modal,
   Pressable,
-  ActivityIndicator,
 } from "react-native";
+import BrandedLoader from "../../../components/BrandedLoader";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -393,7 +393,7 @@ export default function SearchResults() {
                 <View style={styles.emptyWrap}>
                   {loadingServices ? (
                     <View style={styles.loadingWrap}>
-                      <ActivityIndicator size="large" color={accentColor} />
+                      <BrandedLoader size={56} />
                       <Text style={styles.loadingText}>Loading results…</Text>
                     </View>
                   ) : (

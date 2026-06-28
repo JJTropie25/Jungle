@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View, Platform } from "react-native";
+import { StyleSheet, Text, View, Platform } from "react-native";
+import BrandedLoader from "../components/BrandedLoader";
 import { useRouter } from "expo-router";
 import { supabase } from "../lib/supabase";
 import { useI18n } from "../lib/i18n";
@@ -141,7 +142,7 @@ export default function AuthCallback() {
 
   return (
     <View style={styles.container}>
-      <ActivityIndicator color={colors.surface} size="large" />
+      <BrandedLoader size={64} />
       {message ? <Text style={styles.message}>{message}</Text> : null}
     </View>
   );
