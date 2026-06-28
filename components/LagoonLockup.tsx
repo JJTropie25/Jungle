@@ -39,8 +39,8 @@ export function LagoonLockup({
 
   const textStyle: TextStyle = {
     color,
-    fontSize: size * 0.92,
-    lineHeight: size * 1.02,
+    fontSize: size * 0.62,
+    lineHeight: size * 0.7,
     letterSpacing: -0.5,
     includeFontPadding: false,
     ...(fontFamily ? { fontFamily } : { fontWeight: '700' }),
@@ -49,7 +49,7 @@ export function LagoonLockup({
   return (
     <View style={[{ flexDirection: 'row', alignItems: 'center', gap }, style]}>
       <LagoonLogo size={size} tile={tile} variant={onDark ? 'dark' : 'light'} />
-      <Text style={textStyle}>lagoon</Text>
+      <Text style={textStyle}>Lagoon</Text>
     </View>
   );
 }

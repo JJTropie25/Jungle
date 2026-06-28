@@ -1,4 +1,4 @@
-import { AppState, Image, Pressable, StyleSheet, View } from "react-native";
+import { AppState, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -8,6 +8,7 @@ import { supabase } from "../lib/supabase";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../lib/theme-context";
 import { type ThemeColors } from "../lib/theme";
+import { LagoonLockup } from "./LagoonLockup";
 
 type TabTopNotchProps = {
   hideBell?: boolean;
@@ -31,12 +32,6 @@ function makeStyles(c: ThemeColors) {
       shadowRadius: 6,
       shadowOffset: { width: 0, height: 4 },
       elevation: 8,
-    },
-    notchLogo: {
-      width: 110,
-      height: 30,
-      marginTop: -1,
-      marginLeft: -4,
     },
     bellButton: {
       position: "absolute",
@@ -66,8 +61,6 @@ export default function TabTopNotch({ hideBell }: TabTopNotchProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const logo = require("../assets/images/Lagoon_notch.png");
-
   const loadCount = useCallback(async () => {
     if (!supabase || !user?.id) {
       setUnreadCount(0);
@@ -123,7 +116,7 @@ export default function TabTopNotch({ hideBell }: TabTopNotchProps) {
 
   return (
     <View style={[styles.fixedNotch, { top: insets.top }]}>
-      <Image source={logo} resizeMode="cover" style={styles.notchLogo} />
+      <LagoonLockup size={30} />
       {!hideBell ? (
         <Pressable
           style={styles.bellButton}
