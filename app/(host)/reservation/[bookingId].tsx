@@ -16,7 +16,7 @@ import { type ThemeColors } from "../../../lib/theme";
 import { supabase } from "../../../lib/supabase";
 import { useI18n } from "../../../lib/i18n";
 import { useAppDialog } from "../../../components/AppDialogProvider";
-import { toCategoryIcon } from "../../../lib/services";
+import { toCategoryIcon, parseFirstImageUrl } from "../../../lib/services";
 
 const HEADER_COLOR = "#4F9B9B";
 
@@ -225,7 +225,7 @@ export default function HostReservationDetail() {
       const svc = Array.isArray(booking.service) ? booking.service[0] : booking.service;
       setServiceTitle(svc?.title ?? "-");
       setServiceLocation(svc?.location ?? "-");
-      setServiceImage(svc?.image_url ?? null);
+      setServiceImage(parseFirstImageUrl(svc?.image_url) ?? null);
       setServiceCategory(svc?.category ?? null);
 
       if (booking.guest_id) {

@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
-  ActivityIndicator,
 } from "react-native";
+import BrandedLoader from "./BrandedLoader";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { reverseGeocodeLabel, searchPlaceSuggestions, type PlaceSuggestion } from "../lib/geocoding";
@@ -167,7 +167,7 @@ export default function LocationPickerModal({
                 onPress={handleConfirmMap}
               >
                 {mapResolving ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <BrandedLoader size={22} color="#fff" />
                 ) : (
                   <Text style={s.confirmBtnText}>Use this location</Text>
                 )}
@@ -182,7 +182,7 @@ export default function LocationPickerModal({
             ) : null}
             {loading ? (
               <View style={s.loadingRow}>
-                <ActivityIndicator size="small" color={accentColor} />
+                <BrandedLoader size={22} />
                 <Text style={[s.mutedText, { color: colors.textMuted }]}>Searching…</Text>
               </View>
             ) : listData.length === 0 && query.trim().length > 0 ? (

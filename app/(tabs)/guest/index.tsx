@@ -24,6 +24,7 @@ import {
   toPriceLabel,
   toCategoryIcon,
   toDistanceLabel,
+  parseFirstImageUrl,
   Service,
 } from "../../../lib/services";
 import { fetchPOIs, nearestPOI, POI } from "../../../lib/poi";
@@ -346,7 +347,7 @@ export default function GuestHome() {
       category={item.category}
       categoryIconName={toCategoryIcon(item.category)}
       distanceLabel={toDistanceLabel(distanceForCard?.(item))}
-      imageSource={item.image_url ? { uri: item.image_url } : placeholderImage}
+      imageSource={parseFirstImageUrl(item.image_url) ? { uri: parseFirstImageUrl(item.image_url)! } : placeholderImage}
       rating={item.rating}
       reviewCount={item.review_count ?? null}
       isFavorite={favoriteIds.has(item.id)}

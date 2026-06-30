@@ -236,7 +236,7 @@ export default function Profile() {
         {/* Payment Methods */}
         <Pressable
           style={styles.listRow}
-          onPress={() => dialog.alert("Payment Methods", "Coming soon")}
+          onPress={() => router.push("/(tabs)/profile/Payments")}
         >
           <MaterialCommunityIcons name="credit-card-outline" size={20} color={colors.textSecondary} />
           <Text style={styles.listRowLabel}>Payment Methods</Text>
@@ -280,7 +280,7 @@ export default function Profile() {
         {/* Terms & Conditions */}
         <Pressable
           style={styles.listRow}
-          onPress={() => dialog.alert("Terms & Conditions", "Coming soon")}
+          onPress={() => router.push("/(tabs)/profile/TermsAndConditions")}
         >
           <MaterialCommunityIcons name="file-document-outline" size={20} color={colors.textSecondary} />
           <Text style={styles.listRowLabel}>Terms & Conditions</Text>
@@ -291,7 +291,7 @@ export default function Profile() {
         {/* Help */}
         <Pressable
           style={styles.listRow}
-          onPress={() => dialog.alert("Help", "Coming soon")}
+          onPress={() => router.push("/(tabs)/profile/Help")}
         >
           <MaterialCommunityIcons name="help-circle-outline" size={20} color={colors.textSecondary} />
           <Text style={styles.listRowLabel}>Help</Text>

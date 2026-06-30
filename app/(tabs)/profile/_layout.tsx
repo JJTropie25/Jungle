@@ -16,7 +16,7 @@ export default function ProfileLayout() {
   }), [colors]);
 
   useEffect(() => {
-    const onSubScreen = /\/(Edit|Language)$/.test(pathname);
+    const onSubScreen = /\/(Edit|Language|Help|TermsAndConditions)$/.test(pathname);
     navigation.setOptions({
       tabBarStyle: onSubScreen ? { display: "none" } : defaultTabBarStyle,
     });

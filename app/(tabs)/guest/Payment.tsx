@@ -188,25 +188,36 @@ export default function Payment() {
 
   const {
     serviceId,
-    slotStart,
-    slotEnd,
+    slotsParam,
     destination,
-    timeslot,
     people,
     microservice,
-    selectedHour,
     category,
   } = useLocalSearchParams<{
     serviceId?: string;
-    slotStart?: string;
-    slotEnd?: string;
+    slotsParam?: string;
     destination?: string;
-    timeslot?: string;
     people?: string;
     microservice?: string;
-    selectedHour?: string;
     category?: string;
   }>();
+
+  const parsedSlots = useMemo(() => {
+    if (!slotsParam) return [];
+    return slotsParam.split(',').map(key => {
+      const sepIdx = key.indexOf('__');
+      const dateKey = key.slice(0, sepIdx);
+      const hour = key.slice(sepIdx + 2);
+      const [hh, mm] = hour.split(':').map(Number);
+      const d = new Date(dateKey);
+      d.setHours(hh, mm, 0, 0);
+      return {
+        start: d.toISOString(),
+        end: new Date(d.getTime() + 30 * 60 * 1000).toISOString(),
+        hour,
+      };
+    });
+  }, [slotsParam]);
 
   const headerColor = (category && CATEGORY_COLORS[category]) ?? DEFAULT_HEADER_COLOR;
 
@@ -242,16 +253,17 @@ export default function Payment() {
       return;
     }
     if (!user) { router.replace("/(auth)/sign-in"); return; }
-    if (!serviceId || !slotStart || !slotEnd) {
+    if (!serviceId || parsedSlots.length === 0) {
       await dialog.alert(t("payment.title"), t("payment.invalidData"));
       return;
     }
 
     setProcessing(true);
     const peopleCount = Number(people ?? 1) || 1;
+    const slotCount = parsedSlots.length;
     let paymentIntentId: string | null = null;
-    let amountCents: number | null = null;
-    let platformFeeCents: number | null = null;
+    let amountCentsPerSlot: number | null = null;
+    let platformFeeCentsPerSlot: number | null = null;
 
     if (method === "card") {
       if (!stripe) {
@@ -261,9 +273,9 @@ export default function Payment() {
       }
       const paymentIntent = await createPaymentIntent({
         service_id: serviceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-        people_count: peopleCount,
+        slot_start: parsedSlots[0].start,
+        slot_end: parsedSlots[0].end,
+        people_count: peopleCount * slotCount,
         currency: "eur",
       });
       if (!paymentIntent.client_secret || !paymentIntent.payment_intent_id) {
@@ -288,43 +300,68 @@ export default function Payment() {
         return;
       }
       paymentIntentId = paymentIntent.payment_intent_id ?? null;
-      amountCents = paymentIntent.amount_cents ?? null;
-      platformFeeCents = paymentIntent.platform_fee_cents ?? null;
+      amountCentsPerSlot = paymentIntent.amount_cents != null
+        ? Math.round(paymentIntent.amount_cents / slotCount)
+        : null;
+      platformFeeCentsPerSlot = paymentIntent.platform_fee_cents != null
+        ? Math.round(paymentIntent.platform_fee_cents / slotCount)
+        : null;
     }
 
-    const qrToken = `BK-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const { data, error } = await supabase
-      .from("bookings")
-      .insert({
-        guest_id: user.id,
-        service_id: serviceId,
-        slot_start: slotStart,
-        slot_end: slotEnd,
-        people_count: peopleCount,
-        qr_token: qrToken,
-        payment_intent_id: paymentIntentId,
-        payment_status: method === "card" ? "paid" : "cash",
-        amount_cents: amountCents ?? (priceEur != null ? Math.round(priceEur * 100) : null),
-        platform_fee_cents: platformFeeCents,
-        currency: "eur",
-      })
-      .select("id")
-      .single();
+    let firstBookingId: string | null = null;
+    let firstQrToken: string | null = null;
+
+    for (let i = 0; i < parsedSlots.length; i++) {
+      const slot = parsedSlots[i];
+      const slotQrToken = `BK-${Date.now() + i}-${Math.random().toString(36).slice(2, 8)}`;
+      const { data, error } = await supabase
+        .from("bookings")
+        .insert({
+          guest_id: user.id,
+          service_id: serviceId,
+          slot_start: slot.start,
+          slot_end: slot.end,
+          people_count: peopleCount,
+          qr_token: slotQrToken,
+          payment_intent_id: paymentIntentId,
+          payment_status: method === "card" ? "paid" : "cash",
+          amount_cents: amountCentsPerSlot ?? (priceEur != null ? Math.round(priceEur * 100) : null),
+          platform_fee_cents: platformFeeCentsPerSlot,
+          currency: "eur",
+        })
+        .select("id")
+        .single();
+
+      if (error) {
+        setProcessing(false);
+        await dialog.alert(t("payment.title"), error.message);
+        return;
+      }
+      if (data && !firstBookingId) {
+        firstBookingId = data.id;
+        firstQrToken = slotQrToken;
+      }
+    }
 
     setProcessing(false);
-
-    if (error) {
-      await dialog.alert(t("payment.title"), error.message);
-      return;
-    }
-
+    const slotTimesStr = parsedSlots.map(s => s.hour).join(', ');
     router.replace({
       pathname: "/(tabs)/guest/BookingConfirmation",
-      params: { bookingId: data.id, qrToken, destination, timeslot, people, microservice, selectedHour },
+      params: {
+        bookingId: firstBookingId,
+        qrToken: firstQrToken,
+        destination,
+        timeslot: slotTimesStr,
+        people,
+        microservice,
+        selectedHour: slotTimesStr,
+      },
     });
   };
 
-  const displayTime = selectedHour ?? timeslot ?? "-";
+  const slotCount = parsedSlots.length;
+  const totalPriceEur = priceEur != null ? priceEur * (slotCount || 1) : null;
+  const displayTime = parsedSlots.length > 0 ? parsedSlots.map(s => s.hour).join(', ') : "-";
   const displayPeople = people ?? "1";
 
   return (
@@ -371,9 +408,16 @@ export default function Payment() {
 
         {/* Price */}
         <View style={[styles.section, styles.priceRow]}>
-          <Text style={styles.priceLabel}>Totale</Text>
+          <View>
+            <Text style={styles.priceLabel}>Totale</Text>
+            {slotCount > 1 && !loadingPrice && (
+              <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                {`${slotCount} slot × €${(priceEur ?? 0).toFixed(2)}`}
+              </Text>
+            )}
+          </View>
           <Text style={styles.priceValue}>
-            {loadingPrice ? "…" : `€${(priceEur ?? 0).toFixed(2)}`}
+            {loadingPrice ? "…" : `€${(totalPriceEur ?? 0).toFixed(2)}`}
           </Text>
         </View>
         <View style={styles.divider} />

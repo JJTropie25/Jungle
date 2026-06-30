@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import LoadingCard from "../../components/LoadingCard";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -11,7 +12,7 @@ import { useAuthState } from "../../lib/auth";
 import { useTheme } from "../../lib/theme-context";
 import { type ThemeColors } from "../../lib/theme";
 import { deleteHostListing, fetchHostListings, resolveHostForUser } from "../../lib/host";
-import { toCategoryIcon, toDistanceLabel, toPriceLabel, type Service } from "../../lib/services";
+import { toCategoryIcon, toDistanceLabel, toPriceLabel, parseFirstImageUrl, type Service } from "../../lib/services";
 import { useAppDialog } from "../../components/AppDialogProvider";
 
 function makeStyles(c: ThemeColors) {
@@ -166,7 +167,9 @@ export default function HostListings() {
             </>
           }
           ListEmptyComponent={
-            <Text style={styles.emptyText}>{emptyText}</Text>
+            loading
+              ? <LoadingCard topSpacing={48} />
+              : <Text style={styles.emptyText}>{emptyText}</Text>
           }
           renderItem={({ item }) => (
             <View>
@@ -174,7 +177,7 @@ export default function HostListings() {
                 fullWidth
                 horizontal
                 flat
-                imageSource={item.image_url ? { uri: item.image_url } : placeholderImage}
+                imageSource={parseFirstImageUrl(item.image_url) ? { uri: parseFirstImageUrl(item.image_url)! } : placeholderImage}
                 title={item.title}
                 price={toPriceLabel(item.price_eur)}
                 location={item.location}

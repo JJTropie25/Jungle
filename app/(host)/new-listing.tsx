@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
+import BrandedLoader from "../../components/BrandedLoader";
 import {
-  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -372,7 +372,7 @@ export default function HostNewListing() {
           <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>New listing</Text>
-        {saving ? <ActivityIndicator size="small" color="#fff" /> : null}
+        {saving ? <BrandedLoader size={22} color="#fff" /> : null}
       </View>
 
       <ScrollView
@@ -441,7 +441,7 @@ export default function HostNewListing() {
               disabled={uploadingImage || imageUrls.length >= 5}
             >
               {uploadingImage ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <BrandedLoader size={22} color="#fff" />
               ) : (
                 <>
                   <MaterialCommunityIcons name="image-plus" size={18} color="#fff" />

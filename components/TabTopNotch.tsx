@@ -14,24 +14,25 @@ type TabTopNotchProps = {
   hideBell?: boolean;
 };
 
-function makeStyles(c: ThemeColors) {
+function makeStyles(c: ThemeColors, isDark: boolean) {
   return StyleSheet.create({
     fixedNotch: {
       position: "absolute",
       left: 0,
       right: 0,
       height: 48,
-      backgroundColor: "#4F9B9B",
+      backgroundColor: c.screenBackground,
       alignItems: "center",
       flexDirection: "row",
       justifyContent: "flex-start",
       paddingLeft: 14,
       zIndex: 50,
       shadowColor: "#000",
-      shadowOpacity: 0.2,
+      shadowOpacity: isDark ? 0 : 0.08,
       shadowRadius: 6,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: isDark ? 0 : 4,
+      borderBottomWidth: isDark ? 0 : 0,
     },
     bellButton: {
       position: "absolute",
@@ -58,8 +59,9 @@ export default function TabTopNotch({ hideBell }: TabTopNotchProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthState();
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { colors, mode } = useTheme();
+  const isDark = mode === 'dark';
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   const [unreadCount, setUnreadCount] = useState(0);
   const loadCount = useCallback(async () => {
     if (!supabase || !user?.id) {
@@ -116,13 +118,13 @@ export default function TabTopNotch({ hideBell }: TabTopNotchProps) {
 
   return (
     <View style={[styles.fixedNotch, { top: insets.top }]}>
-      <LagoonLockup size={30} />
+      <LagoonLockup size={30} onDark={isDark} />
       {!hideBell ? (
         <Pressable
           style={styles.bellButton}
           onPress={() => router.push("/notifications")}
         >
-          <MaterialCommunityIcons name="bell-outline" size={22} color={colors.surface} />
+          <MaterialCommunityIcons name="bell-outline" size={22} color={colors.textSecondary} />
           {unreadCount > 0 ? <View style={styles.badgeDot} /> : null}
         </Pressable>
       ) : null}

@@ -23,6 +23,8 @@ type Props = {
   textColor?: string;
   /** nome del font caricato (default Baloo2_700Bold). Passa undefined per il font di sistema. */
   fontFamily?: string | undefined;
+  /** colore piatto per la sagoma (es. per nasconderla su sfondo dello stesso colore) */
+  flatColor?: string;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -32,6 +34,7 @@ export function LagoonLockup({
   onDark = false,
   textColor,
   fontFamily = 'Baloo2_700Bold',
+  flatColor,
   style,
 }: Props) {
   const color = textColor ?? (onDark ? '#f2ede4' : '#2c8278');
@@ -48,7 +51,7 @@ export function LagoonLockup({
 
   return (
     <View style={[{ flexDirection: 'row', alignItems: 'center', gap }, style]}>
-      <LagoonLogo size={size} tile={tile} variant={onDark ? 'dark' : 'light'} />
+      <LagoonLogo size={size} tile={tile} variant={onDark ? 'dark' : 'light'} flatColor={flatColor} />
       <Text style={textStyle}>Lagoon</Text>
     </View>
   );

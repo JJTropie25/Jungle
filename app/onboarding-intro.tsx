@@ -1,10 +1,10 @@
 import { useEffect } from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
+import { LagoonLockup } from "../components/LagoonLockup";
 
 export default function OnboardingIntro() {
   const router = useRouter();
-  const logo = require("../assets/images/Lagoon_notch.png");
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -15,7 +15,7 @@ export default function OnboardingIntro() {
 
   return (
     <View style={styles.container}>
-      <Image source={logo} resizeMode="contain" style={styles.logo} />
+      <LagoonLockup size={48} onDark />
     </View>
   );
 }
@@ -26,9 +26,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#0B3F3F",
     alignItems: "center",
     justifyContent: "center",
-  },
-  logo: {
-    width: 180,
-    height: 60,
   },
 });

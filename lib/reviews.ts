@@ -27,7 +27,7 @@ export async function fetchServiceReviews(serviceId?: string | null): Promise<Se
 
   const { data, error } = await supabase
     .from("service_reviews")
-    .select("id, guest_id, rating_10, description, created_at, host_reply")
+    .select("id, guest_id, rating_10, description, created_at, host_reply, author_name")
     .eq("service_id", serviceId)
     .order("created_at", { ascending: false });
 
@@ -56,7 +56,7 @@ export async function fetchServiceReviews(serviceId?: string | null): Promise<Se
     rating_10: Number(row.rating_10 ?? 0),
     description: row.description ?? "",
     created_at: row.created_at ?? new Date().toISOString(),
-    author_name: namesById.get(row.guest_id) ?? "Guest",
+    author_name: namesById.get(row.guest_id) ?? (row.author_name as string | null) ?? "Guest",
     host_reply: row.host_reply ?? null,
   }));
 }
@@ -109,8 +109,7 @@ export async function submitServiceReview(input: {
   if (aggError || !agg || agg.length === 0) return null;
 
   const avgRating10 = agg.reduce((sum, row: any) => sum + Number(row.rating_10 ?? 0), 0) / agg.length;
-  const rating5 = Number((avgRating10 / 2).toFixed(1));
-  const { error: updateError } = await supabase.from("services").update({ rating: rating5 }).eq("id", serviceId);
+  const { error: updateError } = await supabase.from("services").update({ rating: Number(avgRating10.toFixed(1)) }).eq("id", serviceId);
   if (updateError) return updateError.message;
 
   return null;

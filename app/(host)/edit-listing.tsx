@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import BrandedLoader from "../../components/BrandedLoader";
 import {
-  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -634,7 +634,7 @@ export default function HostEditListing() {
           <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t("host.listings.editTitle")}</Text>
-        {saving ? <ActivityIndicator size="small" color="#fff" /> : null}
+        {saving ? <BrandedLoader size={22} color="#fff" /> : null}
       </View>
 
       <ScrollView
@@ -698,7 +698,7 @@ export default function HostEditListing() {
 
           {loading ? (
             <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color={colors.textSecondary} />
+              <BrandedLoader size={28} />
               <Text style={styles.loadingText}>{t("host.loading")}</Text>
             </View>
           ) : null}
@@ -714,7 +714,7 @@ export default function HostEditListing() {
               disabled={uploadingImage || imageUrls.length >= 5}
             >
               {uploadingImage ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <BrandedLoader size={22} color="#fff" />
               ) : (
                 <>
                   <MaterialCommunityIcons name="image-plus" size={18} color="#fff" />
@@ -1040,7 +1040,7 @@ export default function HostEditListing() {
                             }}
                           >
                             {rs.saving ? (
-                              <ActivityIndicator size="small" color="#fff" />
+                              <BrandedLoader size={22} color="#fff" />
                             ) : (
                               <Text style={styles.replyBtnText}>Save</Text>
                             )}

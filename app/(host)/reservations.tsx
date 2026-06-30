@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import LoadingCard from "../../components/LoadingCard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import TabTopNotch from "../../components/TabTopNotch";
@@ -196,7 +197,9 @@ export default function HostReservations() {
             </View>
           }
           ListEmptyComponent={
-            <Text style={styles.emptyText}>{emptyText}</Text>
+            loading
+              ? <LoadingCard topSpacing={48} />
+              : <Text style={styles.emptyText}>{emptyText}</Text>
           }
           renderItem={({ item }) => {
             const isExpired = new Date(item.slot_end).getTime() < Date.now();

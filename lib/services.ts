@@ -55,6 +55,17 @@ export async function fetchServices(
   return services.map(s => ({ ...s, review_count: counts[s.id] ?? 0 }));
 }
 
+export function parseFirstImageUrl(imageUrl: string | null | undefined): string | null {
+  if (!imageUrl) return null;
+  if (imageUrl.trimStart().startsWith("[")) {
+    try {
+      const arr = JSON.parse(imageUrl);
+      return Array.isArray(arr) && arr[0] ? String(arr[0]) : null;
+    } catch { return imageUrl; }
+  }
+  return imageUrl;
+}
+
 export function toPriceLabel(price: number) {
   return `€${price}`;
 }

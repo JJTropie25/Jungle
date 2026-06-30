@@ -15,6 +15,7 @@ import { supabase } from "../../../lib/supabase";
 import QRCode from "react-native-qrcode-svg";
 import { useTheme } from "../../../lib/theme-context";
 import { type ThemeColors } from "../../../lib/theme";
+import { parseFirstImageUrl } from "../../../lib/services";
 
 const HEADER_COLOR = "#4F9B9B";
 const SUCCESS_GREEN = "#2A7A3A";
@@ -143,7 +144,7 @@ export default function BookingConfirmation() {
         const svc = Array.isArray(data?.service) ? (data.service as any[])[0] : (data?.service as any);
         if (svc?.title) setServiceTitle(svc.title);
         if (svc?.location) setServiceLocation(svc.location);
-        if (svc?.image_url) setImageUrl(svc.image_url);
+        if (svc?.image_url) setImageUrl(parseFirstImageUrl(svc.image_url));
       });
     return () => { isMounted = false; };
   }, [bookingId]);

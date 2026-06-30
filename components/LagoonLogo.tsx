@@ -43,10 +43,12 @@ type Props = {
   /** disegna lo sfondo arancio arrotondato (tile app-icon). false = solo sagoma trasparente */
   tile?: boolean;
   variant?: Variant;
+  /** se impostato, riempie la sagoma con questo colore piatto (ignora gradiente e variant) */
+  flatColor?: string;
   style?: StyleProp<ViewStyle>;
 };
 
-export function LagoonLogo({ size = 96, tile = true, variant = 'light', style }: Props) {
+export function LagoonLogo({ size = 96, tile = true, variant = 'light', flatColor, style }: Props) {
   const id = React.useId().replace(/[:]/g, '');
   const blob = size * 0.8;
 
@@ -79,7 +81,9 @@ export function LagoonLogo({ size = 96, tile = true, variant = 'light', style }:
         </LinearGradient>
       </Defs>
 
-      {variant === 'mono' ? (
+      {flatColor ? (
+        <Path d={LAGOON_PATH} fill={flatColor} />
+      ) : variant === 'mono' ? (
         <Path d={LAGOON_PATH} fill={LAGOON_COLORS.ink} />
       ) : (
         <G clipPath={`url(#clip${id})`}>

@@ -13,10 +13,12 @@ import { useI18n } from "../../lib/i18n";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useIsFocused } from "@react-navigation/native";
 import { supabase } from "../../lib/supabase";
+import { parseFirstImageUrl } from "../../lib/services";
 import { useAuthState } from "../../lib/auth";
 import { useTheme } from "../../lib/theme-context";
 import { type ThemeColors } from "../../lib/theme";
 import TabTopNotch from "../../components/TabTopNotch";
+import LoadingCard from "../../components/LoadingCard";
 import { toCategoryIcon } from "../../lib/services";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -179,6 +181,10 @@ function makeStyles(c: ThemeColors) {
     btnDisabled: {
       opacity: 0.6,
     },
+    loadingWrap: {
+      paddingTop: 60,
+      alignItems: "center" as const,
+    },
     emptyText: {
       color: c.textSecondary,
       textAlign: "center",
@@ -238,7 +244,7 @@ export default function Bookings() {
             hasReview: false,
             latitude: row.service?.latitude,
             longitude: row.service?.longitude,
-            imageUrl: row.service?.image_url ?? null,
+            imageUrl: parseFirstImageUrl(row.service?.image_url) ?? null,
             category: row.service?.category ?? null,
             slotStart: row.slot_start,
           };
@@ -270,9 +276,8 @@ export default function Bookings() {
 
   const emptyState = useMemo(() => {
     if (!user) return t("bookings.signIn");
-    if (loading) return t("bookings.loading");
     return t("bookings.empty");
-  }, [loading, t, user]);
+  }, [t, user]);
 
   const renderItem = ({ item }: { item: BookingItem }) => {
     const isExpired = new Date(item.slotStart).getTime() < Date.now();
@@ -447,7 +452,9 @@ export default function Bookings() {
           <Text style={styles.pageTitle}>{t("bookings.title")}</Text>
         }
         ListEmptyComponent={
-          <Text style={styles.emptyText}>{emptyState}</Text>
+          loading
+            ? <LoadingCard />
+            : <Text style={styles.emptyText}>{emptyState}</Text>
         }
         renderItem={renderItem}
       />

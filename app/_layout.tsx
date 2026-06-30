@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Stack } from "expo-router";
 import { I18nProvider } from "../lib/i18n";
 import { useAuthState } from "../lib/auth";
@@ -18,11 +19,16 @@ export default function RootLayout() {
     ...MaterialCommunityIcons.font,
     Baloo2_700Bold,
   });
+  const [splashDone, setSplashDone] = useState(false);
 
-  if (!fontsLoaded) return <SplashScreen />;
+  // Hold a matching orange screen while fonts load — the animated splash
+  // (same orange background) mounts immediately after, hiding any transition.
+  if (!fontsLoaded) {
+    return <View style={{ flex: 1, backgroundColor: "#e0763c" }} />;
+  }
 
   const Content = (
-      <ThemeProvider>
+    <ThemeProvider>
       <I18nProvider>
         <AppDialogProvider>
           <NotificationsProvider />
@@ -34,8 +40,13 @@ export default function RootLayout() {
               end={{ x: 0, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-
-            <Stack screenOptions={{ headerShown: false, animation: "slide_from_right", contentStyle: { backgroundColor: "#0B3F3F" } }} />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: "slide_from_right",
+                contentStyle: { backgroundColor: "#0B3F3F" },
+              }}
+            />
             <LinearGradient
               colors={[
                 "rgba(11,63,63,0)",
@@ -47,17 +58,24 @@ export default function RootLayout() {
               end={{ x: 0, y: 1 }}
               style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
             />
-
           </View>
         </AppDialogProvider>
       </I18nProvider>
-      </ThemeProvider>
+    </ThemeProvider>
   );
-  return <StripeRootProvider>{Content}</StripeRootProvider>;
+
+  return (
+    <View style={{ flex: 1 }}>
+      <StripeRootProvider>{Content}</StripeRootProvider>
+      {/* Animated overlay — slides off to the right when done, revealing the
+          app underneath with no flash. Fonts are loaded so Baloo2 is available. */}
+      {!splashDone && (
+        <SplashScreen onDone={() => setSplashDone(true)} />
+      )}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
+  root: { flex: 1 },
 });

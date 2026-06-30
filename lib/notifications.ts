@@ -73,21 +73,25 @@ export async function registerForPushNotifications(userId?: string) {
 
 export async function fetchNotifications(userId?: string) {
   if (!supabase || !userId) return [];
+  const now = new Date().toISOString();
   const { data } = await supabase
     .from("notifications")
     .select("*")
     .eq("user_id", userId)
+    .or(`scheduled_for.is.null,scheduled_for.lte.${now}`)
     .order("created_at", { ascending: false });
   return (data ?? []) as NotificationRow[];
 }
 
 export async function getUnreadCount(userId?: string) {
   if (!supabase || !userId) return 0;
+  const now = new Date().toISOString();
   const { count } = await supabase
     .from("notifications")
     .select("*", { count: "exact", head: true })
     .eq("user_id", userId)
-    .is("read_at", null);
+    .is("read_at", null)
+    .or(`scheduled_for.is.null,scheduled_for.lte.${now}`);
   return count ?? 0;
 }
 

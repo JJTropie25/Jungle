@@ -7,7 +7,7 @@ import {
   Pressable,
   Platform,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "../lib/theme-context";
@@ -23,122 +23,134 @@ import {
 } from "../lib/notifications";
 import * as Notifications from "expo-notifications";
 
-function humanizeEtaMinutes(totalMinutes: number): string {
-  const minutes = Math.max(0, Math.floor(totalMinutes));
-  const days = Math.floor(minutes / 1440);
-  const hours = Math.floor((minutes % 1440) / 60);
-  const mins = minutes % 60;
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${days} day${days === 1 ? "" : "s"}`);
-  if (hours > 0) parts.push(`${hours} h`);
-  if (mins > 0 || parts.length === 0) parts.push(`${mins} min`);
-  return parts.join(" ");
+// ── type metadata ─────────────────────────────────────────────
+type TypeMeta = { icon: string; color: string };
+
+const TYPE_META: Record<string, TypeMeta> = {
+  host_new_booking: { icon: "account-plus-outline",  color: "#4F9B9B" },
+  guest_start_soon: { icon: "clock-start",           color: "#1A4F8A" },
+  guest_end_soon:   { icon: "clock-end",             color: "#C8930A" },
+  booking_confirm:  { icon: "check-circle-outline",  color: "#2E7D32" },
+  booking_cancel:   { icon: "close-circle-outline",  color: "#C62828" },
+};
+const DEFAULT_META: TypeMeta = { icon: "bell-outline", color: "#888" };
+
+function typeMeta(type: string | null | undefined): TypeMeta {
+  return (type && TYPE_META[type]) || DEFAULT_META;
 }
 
-function normalizeNotificationBody(body: string | null, data: any | null): string | null {
-  if (!body) return body;
-  const etaRaw = Number(data?.eta_minutes);
-  if (Number.isFinite(etaRaw)) {
-    return `New guest arrives in ${humanizeEtaMinutes(etaRaw)}`;
-  }
-  const match = body.match(/New guest arrives in\s+(\d+)\s+min/i);
-  if (!match) return body;
-  const parsed = Number(match[1]);
-  if (!Number.isFinite(parsed)) return body;
-  return `New guest arrives in ${humanizeEtaMinutes(parsed)}`;
+// ── time formatting ───────────────────────────────────────────
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const min  = Math.floor(diff / 60000);
+  if (min < 1)   return "just now";
+  if (min < 60)  return `${min} min ago`;
+  const h = Math.floor(min / 60);
+  if (h < 24)    return `${h} h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7)     return `${d} day${d === 1 ? "" : "s"} ago`;
+  return new Date(iso).toLocaleDateString();
 }
 
+// ── styles ────────────────────────────────────────────────────
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: c.screenBackground },
+    screen:    { flex: 1, backgroundColor: c.screenBackground },
     header: {
       flexDirection: "row",
       alignItems: "center",
       paddingHorizontal: 16,
       paddingBottom: 12,
       gap: 10,
-      backgroundColor: "#4F9B9B",
     },
-    backButton: { padding: 4 },
-    title: {
+    backBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerTitle: {
       flex: 1,
-      fontSize: 20,
-      fontWeight: "600",
-      color: "#fff",
+      fontSize: 18,
+      fontWeight: "700",
+      fontFamily: "Baloo2_700Bold",
+      color: c.textPrimary,
     },
-    markAll: { paddingHorizontal: 8, paddingVertical: 6 },
+    markAllBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 8,
+      backgroundColor: c.surfaceSoft,
+    },
     markAllText: {
-      color: "rgba(255,255,255,0.65)",
-      fontWeight: "600",
       fontSize: 12,
+      fontWeight: "600",
+      color: c.textSecondary,
     },
-    scrollContent: { padding: 16, paddingBottom: 32 },
-    notifBox: {
-      backgroundColor: c.cardBackground,
+
+    // permission banner
+    permBanner: {
+      marginHorizontal: 16,
+      marginBottom: 12,
       borderRadius: 12,
-      overflow: "hidden",
+      backgroundColor: c.warmSurface,
+      padding: 14,
+      gap: 8,
     },
-    row: { paddingHorizontal: 16, paddingVertical: 14 },
-    rowUnread: { backgroundColor: "rgba(255,179,107,0.14)" },
-    rowInner: { gap: 4 },
+    permTitle:  { fontWeight: "700", color: c.warmAccentDark, fontSize: 14 },
+    permBody:   { fontSize: 13, color: c.textSecondary, lineHeight: 18 },
+    permBtn: {
+      alignSelf: "flex-start",
+      backgroundColor: c.warmAccent,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    permBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+
+    // list
+    list: { marginHorizontal: 16, borderRadius: 14, overflow: "hidden" },
+    row: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+      gap: 12,
+      backgroundColor: c.cardBackground,
+    },
+    rowUnread: { backgroundColor: c.warmSurface },
+    iconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 1,
+    },
+    rowContent:  { flex: 1, gap: 2 },
+    rowTitle:    { fontSize: 14, fontWeight: "700", color: c.textPrimary, lineHeight: 19 },
+    rowBody:     { fontSize: 13, color: c.textSecondary, lineHeight: 18 },
+    rowTime:     { fontSize: 11, color: c.textMuted, marginTop: 2 },
     unreadDot: {
-      position: "absolute",
-      right: 0,
-      top: 2,
       width: 8,
       height: 8,
       borderRadius: 4,
       backgroundColor: c.warmAccent,
+      marginTop: 6,
+      flexShrink: 0,
     },
-    separator: {
-      height: 1,
-      backgroundColor: c.divider,
-      marginHorizontal: 16,
-    },
-    cardTitle: {
-      fontWeight: "600",
-      color: c.textPrimary,
-      paddingRight: 16,
-    },
-    cardBody: {
-      color: c.textPrimary,
-      fontSize: 13,
-    },
-    cardTime: {
-      color: c.textSecondary,
-      fontSize: 12,
-      marginTop: 2,
-    },
-    emptyText: {
-      color: "rgba(255,255,255,0.6)",
-      fontWeight: "600",
-      marginTop: 20,
-      textAlign: "center",
-    },
-    permissionCard: {
-      backgroundColor: "rgba(255,255,255,0.08)",
-      borderRadius: 12,
-      padding: 12,
-      gap: 8,
-      marginBottom: 16,
-    },
-    permissionTitle: { fontWeight: "600", color: "#fff" },
-    permissionBody: { color: "rgba(255,255,255,0.65)" },
-    permissionButton: {
-      alignSelf: "flex-start",
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 10,
-      backgroundColor: c.warmAccent,
-    },
-    permissionButtonText: {
-      color: c.background,
-      fontWeight: "600",
-    },
-    disabled: { opacity: 0.5 },
+    separator: { height: 1, backgroundColor: c.divider },
+
+    // empty / loading
+    emptyWrap: { alignItems: "center", paddingTop: 60, gap: 12 },
+    emptyIcon: { opacity: 0.25 },
+    emptyText: { fontSize: 15, color: c.textSecondary, fontWeight: "600" },
+    emptySubtext: { fontSize: 13, color: c.textMuted, textAlign: "center", paddingHorizontal: 32 },
   });
 }
 
+// ── component ─────────────────────────────────────────────────
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -152,91 +164,89 @@ export default function NotificationsScreen() {
   const [needsPermission, setNeedsPermission] = useState(false);
   const [registering, setRegistering] = useState(false);
 
-  const loadNotifications = useCallback(async () => {
-    if (!user?.id) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
+  const load = useCallback(async () => {
+    if (!user?.id) { setItems([]); setLoading(false); return; }
     setLoading(true);
     const data = await fetchNotifications(user.id);
     setItems(data);
     setLoading(false);
   }, [user?.id]);
 
-  useEffect(() => {
-    loadNotifications().catch(() => setLoading(false));
-  }, [loadNotifications]);
+  useEffect(() => { load().catch(() => setLoading(false)); }, [load]);
 
   useEffect(() => {
-    if (Platform.OS === "web") {
-      setNeedsPermission(false);
-      return;
-    }
+    if (Platform.OS === "web") { setNeedsPermission(false); return; }
     Notifications.getPermissionsAsync()
-      .then(({ status }) => {
-        setNeedsPermission(status !== "granted");
-      })
+      .then(({ status }) => setNeedsPermission(status !== "granted"))
       .catch(() => null);
   }, []);
 
+  const unreadCount = items.filter(i => !i.read_at).length;
+
   return (
-    <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#fff" />
+    <View style={styles.screen}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <Pressable style={styles.backBtn} onPress={() => router.back()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
         </Pressable>
-        <Text style={styles.title}>{t("notifications.title")}</Text>
-        <Pressable
-          style={styles.markAll}
-          onPress={async () => {
+        <Text style={styles.headerTitle}>{t("notifications.title")}</Text>
+        {unreadCount > 0 && (
+          <Pressable style={styles.markAllBtn} onPress={async () => {
             await markAllNotificationsRead(user?.id);
-            loadNotifications().catch(() => null);
-          }}
-        >
-          <Text style={styles.markAllText}>{t("notifications.markAll")}</Text>
-        </Pressable>
+            load().catch(() => null);
+          }}>
+            <Text style={styles.markAllText}>{t("notifications.markAll")}</Text>
+          </Pressable>
+        )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {needsPermission ? (
-          <View style={styles.permissionCard}>
-            <Text style={styles.permissionTitle}>{t("notifications.permissionTitle")}</Text>
-            <Text style={styles.permissionBody}>{t("notifications.permissionBody")}</Text>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Permission banner */}
+        {needsPermission && (
+          <View style={styles.permBanner}>
+            <Text style={styles.permTitle}>{t("notifications.permissionTitle")}</Text>
+            <Text style={styles.permBody}>{t("notifications.permissionBody")}</Text>
             <Pressable
-              style={[styles.permissionButton, registering && styles.disabled]}
+              style={[styles.permBtn, registering && { opacity: 0.5 }]}
+              disabled={registering}
               onPress={async () => {
                 if (!user?.id) return;
                 setRegistering(true);
                 const { status } = await Notifications.requestPermissionsAsync();
                 setNeedsPermission(status !== "granted");
-                if (status === "granted") {
-                  await registerForPushNotifications(user.id);
-                }
+                if (status === "granted") await registerForPushNotifications(user.id);
                 setRegistering(false);
               }}
-              disabled={registering}
             >
-              <Text style={styles.permissionButtonText}>
+              <Text style={styles.permBtnText}>
                 {registering ? t("auth.loading") : t("notifications.permissionAction")}
               </Text>
             </Pressable>
           </View>
-        ) : null}
+        )}
 
+        {/* Content */}
         {loading ? (
-          <Text style={styles.emptyText}>{t("notifications.loading")}</Text>
+          <View style={styles.emptyWrap}>
+            <MaterialCommunityIcons name="bell-outline" size={48} color={colors.textMuted} style={styles.emptyIcon} />
+            <Text style={styles.emptyText}>{t("notifications.loading")}</Text>
+          </View>
         ) : items.length === 0 ? (
-          <Text style={styles.emptyText}>{t("notifications.empty")}</Text>
+          <View style={styles.emptyWrap}>
+            <MaterialCommunityIcons name="bell-sleep-outline" size={52} color={colors.textMuted} style={styles.emptyIcon} />
+            <Text style={styles.emptyText}>{t("notifications.empty")}</Text>
+            <Text style={styles.emptySubtext}>{"You'll see booking reminders and updates here."}</Text>
+          </View>
         ) : (
-          <View style={styles.notifBox}>
+          <View style={styles.list}>
             {items.map((item, index) => {
               const unread = !item.read_at;
-              const body = normalizeNotificationBody(item.body, item.data);
+              const meta = typeMeta(item.type);
               return (
                 <View key={item.id}>
                   {index > 0 && <View style={styles.separator} />}
@@ -245,18 +255,28 @@ export default function NotificationsScreen() {
                     onPress={async () => {
                       if (unread) {
                         await markNotificationRead(item.id);
-                        loadNotifications().catch(() => null);
+                        load().catch(() => null);
                       }
                     }}
                   >
-                    <View style={styles.rowInner}>
-                      {unread && <View style={styles.unreadDot} />}
-                      <Text style={styles.cardTitle}>{item.title}</Text>
-                      {body ? <Text style={styles.cardBody}>{body}</Text> : null}
-                      <Text style={styles.cardTime}>
-                        {new Date(item.created_at).toLocaleString()}
-                      </Text>
+                    {/* type icon */}
+                    <View style={[styles.iconWrap, { backgroundColor: meta.color + "18" }]}>
+                      <MaterialCommunityIcons
+                        name={meta.icon as any}
+                        size={20}
+                        color={meta.color}
+                      />
                     </View>
+
+                    {/* text */}
+                    <View style={styles.rowContent}>
+                      <Text style={styles.rowTitle}>{item.title}</Text>
+                      {item.body ? <Text style={styles.rowBody}>{item.body}</Text> : null}
+                      <Text style={styles.rowTime}>{relativeTime(item.created_at)}</Text>
+                    </View>
+
+                    {/* unread dot */}
+                    {unread && <View style={styles.unreadDot} />}
                   </Pressable>
                 </View>
               );
@@ -264,6 +284,6 @@ export default function NotificationsScreen() {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

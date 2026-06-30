@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import type { Service, ServiceAmenities } from "./services";
+import { parseFirstImageUrl } from "./services";
 
 export type HostAccount = {
   id: string;
@@ -303,7 +304,7 @@ export async function fetchHostReservations(
       {
         title: item.title,
         location: item.location,
-        image_url: item.image_url ?? null,
+        image_url: parseFirstImageUrl(item.image_url) ?? null,
         category: item.category ?? null,
       },
     ])

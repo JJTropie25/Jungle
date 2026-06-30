@@ -7,7 +7,7 @@ import {
   Modal,
   Pressable,
 } from "react-native";
-import BrandedLoader from "../../../components/BrandedLoader";
+import LoadingCard from "../../../components/LoadingCard";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -26,6 +26,7 @@ import {
   toDistanceLabel,
   toPriceLabel,
   toCategoryIcon,
+  parseFirstImageUrl,
 } from "../../../lib/services";
 import { fetchPOIs, nearestPOI, POI } from "../../../lib/poi";
 import { useAuthState } from "../../../lib/auth";
@@ -392,10 +393,7 @@ export default function SearchResults() {
               ListEmptyComponent={
                 <View style={styles.emptyWrap}>
                   {loadingServices ? (
-                    <View style={styles.loadingWrap}>
-                      <BrandedLoader size={56} />
-                      <Text style={styles.loadingText}>Loading results…</Text>
-                    </View>
+                    <LoadingCard size={56} topSpacing={32} label={t("search.loading")} />
                   ) : (
                   <Text style={styles.emptyTitle}>{t("search.noResultsTitle")}</Text>
                   )}
@@ -411,7 +409,7 @@ export default function SearchResults() {
                             flat
                             containerStyle={styles.card}
                             imageStyle={styles.cardImage}
-                            imageSource={item.image_url ? { uri: item.image_url } : placeholderImage}
+                            imageSource={parseFirstImageUrl(item.image_url) ? { uri: parseFirstImageUrl(item.image_url)! } : placeholderImage}
                             title={item.title}
                             price={toPriceLabel(item.price_eur)}
                             location={item.location}
@@ -465,7 +463,7 @@ export default function SearchResults() {
                   containerStyle={styles.card}
                   imageStyle={styles.cardImage}
                   imageSource={
-                    item.image_url ? { uri: item.image_url } : placeholderImage
+                    parseFirstImageUrl(item.image_url) ? { uri: parseFirstImageUrl(item.image_url)! } : placeholderImage
                   }
                   title={item.title}
                   price={toPriceLabel(item.price_eur)}
@@ -596,7 +594,7 @@ export default function SearchResults() {
                     containerStyle={styles.mapCard}
                     imageStyle={styles.mapCardImage}
                     imageSource={
-                      item.image_url ? { uri: item.image_url } : placeholderImage
+                      parseFirstImageUrl(item.image_url) ? { uri: parseFirstImageUrl(item.image_url)! } : placeholderImage
                     }
                     title={item.title}
                     price={toPriceLabel(item.price_eur)}

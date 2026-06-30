@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import LoadingCard from "../../../components/LoadingCard";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -426,8 +427,9 @@ export default function ServiceDetails() {
   });
 
   const [slots, setSlots] = useState<{ id: string; time: string; start: string; end: string }[]>([]);
+  const [loadingService, setLoadingService] = useState(true);
   const [, setLoadingSlots] = useState(true);
-  const [selectedHour, setSelectedHour] = useState<string | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [serviceTitle, setServiceTitle] = useState<string | null>(null);
@@ -472,7 +474,8 @@ export default function ServiceDetails() {
 
   useEffect(() => {
     let isMounted = true;
-    if (!serviceId || !supabase) return;
+    if (!serviceId || !supabase) { setLoadingService(false); return; }
+    setLoadingService(true);
     supabase
       .from("services")
       .select("title, location, image_url, description, category, amenities, latitude, longitude, price_eur")
@@ -489,6 +492,7 @@ export default function ServiceDetails() {
         setServiceLatitude(data?.latitude ?? null);
         setServiceLongitude(data?.longitude ?? null);
         setServicePrice(data?.price_eur ?? null);
+        setLoadingService(false);
       });
     return () => { isMounted = false; };
   }, [serviceId]);
@@ -627,7 +631,18 @@ export default function ServiceDetails() {
     return items;
   }, [serviceAmenities, t]);
 
+  const toggleSlot = (dateKey: string, h: string) => {
+    const key = `${dateKey}__${h}`;
+    setSelectedSlots(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const openMap = () => {
+    const firstHour = Array.from(selectedSlots)[0]?.split('__')[1] ?? null;
     router.push({
       pathname: "/Directions",
       params: {
@@ -635,7 +650,7 @@ export default function ServiceDetails() {
         destination: summaryLocation,
         latitude: serviceLatitude != null ? String(serviceLatitude) : undefined,
         longitude: serviceLongitude != null ? String(serviceLongitude) : undefined,
-        timeslot: selectedHour ?? timeslot ?? "",
+        timeslot: firstHour ?? timeslot ?? "",
         people: people ?? "1",
         category: normalizedCategory ?? "",
       },
@@ -644,26 +659,15 @@ export default function ServiceDetails() {
 
   const handleBooking = async () => {
     if (!user) { router.push("/(auth)/sign-in"); return; }
-    if (!serviceId || !selectedHour) return;
-    const [hh, mm] = selectedHour.split(":").map((v) => Number(v));
-    const baseDate = requestedDate ?? new Date();
-    const bookingStart = new Date(baseDate);
-    bookingStart.setHours(hh, mm, 0, 0);
-    if (!requestedDate && bookingStart.getTime() < Date.now()) {
-      bookingStart.setDate(bookingStart.getDate() + 1);
-    }
-    const bookingEnd = new Date(bookingStart.getTime() + 30 * 60 * 1000);
+    if (!serviceId || selectedSlots.size === 0) return;
     router.push({
       pathname: "/(tabs)/guest/Payment",
       params: {
         serviceId,
-        slotStart: bookingStart.toISOString(),
-        slotEnd: bookingEnd.toISOString(),
+        slotsParam: Array.from(selectedSlots).join(','),
         destination: serviceLocation ?? destination ?? "",
-        timeslot: selectedHour ?? timeslot ?? "",
         people,
         microservice: serviceTitle ?? microservice ?? "",
-        selectedHour,
         category: normalizedCategory ?? "",
       },
     });
@@ -671,6 +675,14 @@ export default function ServiceDetails() {
 
   const catColor = normalizedCategory ? CATEGORY_COLORS_SD[normalizedCategory] : null;
   const catIcon = normalizedCategory ? toCategoryIcon(normalizedCategory) : null;
+
+  if (loadingService) {
+    return (
+      <View style={[styles.screen, { alignItems: "center", justifyContent: "center" }]}>
+        <LoadingCard size={80} topSpacing={0} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -854,29 +866,33 @@ export default function ServiceDetails() {
               <View key={dateKey} style={[styles.dayPanel, { width: panelWidth }]}>
                 <Text style={styles.dayPanelLabel}>{dayLabel}</Text>
                 <View style={styles.daySlots}>
-                  {hours.map((h) => (
-                    <TouchableOpacity
-                      key={h}
-                      style={[
-                        styles.timeChip,
-                        { width: chipWidth },
-                        selectedHour === h && {
-                          borderColor: catColor ?? colors.accent,
-                          backgroundColor: catColor ?? colors.accent,
-                        },
-                      ]}
-                      onPress={() => setSelectedHour(h)}
-                    >
-                      <Text
+                  {hours.map((h) => {
+                    const slotKey = `${dateKey}__${h}`;
+                    const isSelected = selectedSlots.has(slotKey);
+                    return (
+                      <TouchableOpacity
+                        key={h}
                         style={[
-                          styles.timeChipText,
-                          selectedHour === h && { color: "#fff", fontWeight: "700" },
+                          styles.timeChip,
+                          { width: chipWidth },
+                          isSelected && {
+                            borderColor: catColor ?? colors.accent,
+                            backgroundColor: catColor ?? colors.accent,
+                          },
                         ]}
+                        onPress={() => toggleSlot(dateKey, h)}
                       >
-                        {h}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          style={[
+                            styles.timeChipText,
+                            isSelected && { color: "#fff", fontWeight: "700" },
+                          ]}
+                        >
+                          {h}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             ))}
@@ -914,13 +930,21 @@ export default function ServiceDetails() {
         <View style={styles.bookBarInner}>
           <View style={styles.priceBlock}>
             <Text style={styles.priceValue}>
-              {servicePrice != null ? `€${servicePrice.toFixed(2)}` : "—"}
+              {servicePrice != null
+                ? selectedSlots.size > 0
+                  ? `€${(servicePrice * selectedSlots.size).toFixed(2)}`
+                  : `€${servicePrice.toFixed(2)}`
+                : "—"}
             </Text>
-            <Text style={styles.priceLabel}>/ slot</Text>
+            <Text style={styles.priceLabel}>
+              {selectedSlots.size > 1
+                ? `${selectedSlots.size} slot × €${servicePrice?.toFixed(2)}`
+                : "/ slot"}
+            </Text>
           </View>
           <TouchableOpacity
-            style={[styles.bookButton, !selectedHour && styles.bookButtonDisabled]}
-            disabled={!selectedHour}
+            style={[styles.bookButton, selectedSlots.size === 0 && styles.bookButtonDisabled]}
+            disabled={selectedSlots.size === 0}
             onPress={handleBooking}
           >
             <Text style={styles.bookText}>{t("service.bookNow")}</Text>

@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, FlatList } from "react-native";
+import LoadingCard from "../../components/LoadingCard";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ServiceCard from "../../components/ServiceCard";
@@ -15,7 +16,7 @@ import {
   fetchFavoriteServices,
   removeFavorite,
 } from "../../lib/favorites";
-import { toCategoryIcon, toPriceLabel } from "../../lib/services";
+import { toCategoryIcon, toPriceLabel, parseFirstImageUrl } from "../../lib/services";
 import { useFocusEffect } from "@react-navigation/native";
 
 function makeStyles(c: ThemeColors) {
@@ -35,6 +36,10 @@ function makeStyles(c: ThemeColors) {
       height: 1,
       backgroundColor: c.divider,
       marginHorizontal: 16,
+    },
+    loadingWrap: {
+      paddingTop: 60,
+      alignItems: "center" as const,
     },
     emptyText: {
       color: c.textMuted,
@@ -92,9 +97,8 @@ export default function Favorites() {
 
   const emptyText = useMemo(() => {
     if (!user) return t("favorites.signIn");
-    if (loading) return t("favorites.loading");
     return t("favorites.empty");
-  }, [loading, t, user]);
+  }, [t, user]);
 
   return (
     <View style={styles.screen}>
@@ -109,14 +113,16 @@ export default function Favorites() {
             <Text style={styles.title}>{t("favorites.title")}</Text>
           }
           ListEmptyComponent={
-            <Text style={styles.emptyText}>{emptyText}</Text>
+            loading
+              ? <LoadingCard />
+              : <Text style={styles.emptyText}>{emptyText}</Text>
           }
           renderItem={({ item }) => (
             <ServiceCard
               fullWidth
               horizontal
               flat
-              imageSource={item.image_url ? { uri: item.image_url } : placeholderImage}
+              imageSource={parseFirstImageUrl(item.image_url) ? { uri: parseFirstImageUrl(item.image_url)! } : placeholderImage}
               title={item.title}
               price={toPriceLabel(item.price_eur)}
               location={item.location}
