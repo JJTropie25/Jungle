@@ -16,7 +16,7 @@
       "package": "com.lagoon.app",
       "adaptiveIcon": {
         "backgroundColor": "#e0763c",
-        "foregroundImage": "./assets/images/Lagoon_icon.png",
+        "foregroundImage": "./assets/images/Lagoon_icon_fg.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
@@ -40,11 +40,11 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/Lagoon_icon.png",
-          "imageWidth": 130,
+          "imageWidth": 160,
           "resizeMode": "contain",
-          "backgroundColor": "#0B3F3F",
+          "backgroundColor": "#e0763c",
           "dark": {
-            "backgroundColor": "#0B3F3F"
+            "backgroundColor": "#e0763c"
           }
         }
       ],
